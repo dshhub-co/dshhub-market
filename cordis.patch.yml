@@ -1,0 +1,6 @@
+# dsh bundle patch: inserts this plugin into a profile's layer stack.
+# fork: id 沿用 legacy 的 `market`（官方 dshmarket 用 `dsh-market`，避免
+# 同装时撞 loader-entry id 触发 boot-brick 检测）。
+- insert:
+    - id: market
+      name: 'dshhub-market'

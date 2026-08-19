@@ -1,0 +1,92 @@
+/**
+ * fork (dshhub): self-update over the dshhub.co tarball channel instead of
+ * npm. `dshhub-market` is never published to npm, so the market updates
+ * itself by polling the site's version endpoint and reinstalling from the
+ * published tarball — the same channel the legacy plugin used, so existing
+ * installs upgrade in place.
+ */
+
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { runDshPlugin } from './dsh-cli.ts'
+
+/** The fork's own package name (its profile manifest key). */
+export const FORK_SELF_NAME = 'dshhub-market'
+
+/**
+ * Self-contained semver-ish compare (the legacy plugin's cmpVersion):
+ * '0.10.0' > '0.9.3', '1.0.0-rc1' < '1.0.0'. Kept local so this module does
+ * not import from updates.ts (which imports this module — no cycle).
+ */
+function ownIsUpgrade(installed: string, latest: string): boolean {
+  const strip = (v: string): string => v.replace(/-.*$/, '')
+  const pa = strip(installed).split('.').map(n => parseInt(n, 10) || 0)
+  const pb = strip(latest).split('.').map(n => parseInt(n, 10) || 0)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) > (pa[i] || 0)
+  }
+  return /-/.test(installed) && !/-/.test(latest) // prerelease sorts lower
+}
+
+export function updateBase(): string {
+  return process.env.DSHHUB_UPDATE_BASE ?? 'https://www.dshhub.co'
+}
+
+/** The published tarball for the current channel (v1: one public channel). */
+export function selfUpdateTarget(base = updateBase()): string {
+  return `${base}/dshhub-market.tgz`
+}
+
+/** This package's own version, read from its installed package.json. */
+export function readOwnVersion(): string {
+  try {
+    const pkg = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json')
+    if (!existsSync(pkg)) return '0.0.0'
+    return (JSON.parse(readFileSync(pkg, 'utf8')) as { version?: string }).version ?? '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+/** Latest published version per the site's version endpoint, or null. */
+export async function fetchOwnVersion(base = updateBase()): Promise<string | null> {
+  try {
+    const res = await fetch(`${base}/api/market/version?t=${Date.now()}`, { signal: AbortSignal.timeout(15_000) })
+    if (!res.ok) return null
+    const body = (await res.json()) as { version?: unknown }
+    return typeof body.version === 'string' ? body.version : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Poll the version endpoint; when a newer release is published, reinstall
+ * this package from the tarball (the DSH CLI replaces the same-name dep in
+ * the profile manifest). Opt-out: DSHHUB_DISABLE_AUTOUPDATE=1.
+ */
+export function scheduleSelfUpdate(profile: string): void {
+  if (process.env.DSHHUB_DISABLE_AUTOUPDATE === '1') return
+  let checking = false
+  const tick = async (): Promise<void> => {
+    if (checking) return
+    checking = true
+    try {
+      const remote = await fetchOwnVersion()
+      const installed = readOwnVersion()
+      if (remote === null || installed === '0.0.0') return
+      if (!ownIsUpgrade(installed, remote)) return
+      const result = await runDshPlugin(profile, ['add', selfUpdateTarget()])
+      if (result.exitCode !== 0) {
+        console.warn(`[dshhub-market] self-update to ${remote} failed: ${result.stderr.slice(-300)}`)
+      }
+    } catch (error) {
+      console.warn(`[dshhub-market] self-update check failed: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      checking = false
+    }
+  }
+  setTimeout(() => { void tick() }, 3000)
+  setInterval(() => { void tick() }, 6 * 60 * 60 * 1000)
+}

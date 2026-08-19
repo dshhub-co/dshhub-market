@@ -84,15 +84,25 @@ interface InstallOutcome {
   error?: string
 }
 
-/** Install a dshhub catalog entry (by uuid) into the given profile. */
-async function installById(id: unknown, profile: string): Promise<InstallOutcome> {
-  if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{8,64}$/.test(id)) {
-    return { ok: false, error: '无效的插件 id' }
-  }
+/**
+ * Install a catalog entry into the given profile. Two request shapes:
+ *  - `{ id }`  — a dshhub-uploaded plugin (uuid lookup);
+ *  - `{ url }` — a curated registry entry (must match the registry allowlist
+ *               exactly, same rule as the market's own install route).
+ */
+async function installEntry(body: Record<string, unknown>, profile: string): Promise<InstallOutcome> {
+  const id = body?.id
+  const url = body?.url
   const registry = await loadRegistry()
-  const entry = registry.plugins.find(p => p.dshhubId === id)
-  if (entry === undefined) {
-    return { ok: false, error: '插件不在目录中（未上架或尚未审核通过）' }
+  let entry = undefined
+  if (typeof id === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(id)) {
+    entry = registry.plugins.find(p => p.dshhubId === id)
+    if (entry === undefined) return { ok: false, error: '插件不在目录中（未上架或尚未审核通过）' }
+  } else if (typeof url === 'string' && url !== '') {
+    entry = registry.plugins.find(p => p.url.toLowerCase() === url.toLowerCase())
+    if (entry === undefined) return { ok: false, error: '插件不在精选目录中' }
+  } else {
+    return { ok: false, error: '无效的插件 id' }
   }
   const target = entryNeedsZip(entry) ? await materializeTgz(entry) : installTargetFor(entry)
   if (target === null) {
@@ -141,7 +151,7 @@ export function createBridgeServer(opts: { profile: string }): ReturnType<typeof
         .then((buf) => {
           let body: Record<string, unknown> = {}
           try { body = JSON.parse(buf.toString('utf8') || '{}') as Record<string, unknown> } catch { /* empty body */ }
-          return enqueueInstall(() => installById(body?.id, profile))
+          return enqueueInstall(() => installEntry(body, profile))
         })
         .then((result) => send(res, result.ok ? 200 : 400, result))
         .catch(() => send(res, 400, { ok: false, error: '请求无效' }))

@@ -11,6 +11,7 @@ import { en, zh } from './locales.ts'
 import { InstallToast } from './InstallToast.tsx'
 import { MarketSection } from './MarketSection.tsx'
 import { SettingsCard } from './SettingsCard.tsx'
+import { StoreFab } from './StoreFab.tsx'
 import type { ThemeSnapshot, Translate } from './market-data.ts'
 
 const NS = 'dshhub-market'
@@ -94,6 +95,16 @@ export function apply(ctx: MarketClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dshhub-market: dictionaries')
   const t = ctx.locale.bind(NS)
 
+  // MarketSection 的宿主依赖：设置页注册处与右下角商城入口共用同一来源。
+  const marketDeps = {
+    locale: ctx.locale,
+    theme: ctx.theme,
+    themeStore: {
+      subscribe: (cb: () => void) => ctx.on('theme/change', cb),
+      getSnapshot: () => ctx.theme.getTheme(),
+    },
+  }
+
   // Kept so the removal flow can retire the market's own nav entry the
   // moment the package is gone: leaving "插件市场" in the left menu after
   // the user removed it is the card claiming something the profile no
@@ -112,12 +123,7 @@ export function apply(ctx: MarketClientContext): void {
       inject: () => ({ t }),
     }, () => h(MarketSection, {
       t,
-      locale: ctx.locale,
-      theme: ctx.theme,
-      themeStore: {
-        subscribe: (cb: () => void) => ctx.on('theme/change', cb),
-        getSnapshot: () => ctx.theme.getTheme(),
-      },
+      ...marketDeps,
     }))
     if (typeof off === 'function') retireSection = off as () => void
     return off
@@ -146,4 +152,13 @@ export function apply(ctx: MarketClientContext): void {
     id: 'dshhub-market-toast',
     label: () => 'dshhub-market',
   }, Toast))
+
+  // 右下角商城入口：悬浮按钮，点击打开内嵌市场面板。
+  // shell.overlay 是列表槽（additive、click-through），专用于浮在应用之上的自有表面。
+  const Fab = () => h(StoreFab, { t, market: marketDeps })
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'dshhub-market-fab',
+    label: () => 'dshhub-market',
+  }, Fab))
 }

@@ -42,12 +42,20 @@ export interface RegistryPlugin {
   host?: 'dshhub'
   /** Catalog page URL for the entry (awesome entries carry it natively). */
   page?: string
+  /** manifest v2: content kind (theme/plugin/tool/skill). Absent in old catalogs. */
+  kind?: string
+  /** manifest v2: capability tier (appearance/utility/agentic), derived from kind. */
+  tier?: string
+  /** manifest v2: SPDX license id or common license name (dshhub entries). */
+  license?: string
 }
 
 export interface Registry {
   updated: string
   count: number
   categories: Record<string, Record<string, string>>
+  /** manifest v2: tier id → localized labels (appearance/utility/agentic). */
+  tiers?: Record<string, Record<string, string>>
   plugins: RegistryPlugin[]
 }
 

@@ -40,12 +40,20 @@ export interface RegistryPlugin {
   dshhubId?: string
   /** fork (dshhub): 'dshhub' for entries uploaded to dshhub.co. */
   host?: 'dshhub'
+  /** manifest v2: content kind (theme/plugin/tool/skill). Absent in old catalogs. */
+  kind?: string
+  /** manifest v2: capability tier (appearance/utility/agentic), derived from kind. */
+  tier?: string
+  /** manifest v2: SPDX license id or common license name (dshhub entries). */
+  license?: string
 }
 
 /** The catalog payload under `registry` in /dsh-market/registry. */
 export interface Registry {
   count: number
   categories: Record<string, LocalizedText>
+  /** manifest v2: tier id → localized labels (appearance/utility/agentic). */
+  tiers?: Record<string, LocalizedText>
   plugins: RegistryPlugin[]
 }
 
@@ -227,6 +235,13 @@ export interface ListQuery {
   sort: string
   /** Keep only plugins published within the last N days; undefined = any time. */
   sinceDays?: number
+  /** Active capability tier (manifest v2: appearance/utility/agentic), or 'all'. */
+  tier?: string
+}
+
+/** Capability tier of an entry, defaulting to utility for pre-v2 catalogs. */
+export function tierOf(p: { tier?: string }): string {
+  return p.tier ?? 'utility'
 }
 
 /**
@@ -249,6 +264,7 @@ export function visiblePlugins(plugins: RegistryPlugin[], options: ListQuery): R
   const list = plugins.filter((p) => {
     if (isMarketItself(p)) return false
     if (options.category !== 'all' && p.category !== options.category) return false
+    if (options.tier !== undefined && options.tier !== 'all' && tierOf(p) !== options.tier) return false
     if (options.sinceDays !== undefined && !withinDays(p.added, options.sinceDays)) return false
     if (query === '') return true
     const desc = (p.description && (p.description[options.lang] || p.description.en)) || ''

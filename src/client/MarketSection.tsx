@@ -58,6 +58,13 @@ function isHostDependencyFinding(value: unknown): value is SharedHostPackageDepe
 
 const HOST_DEPENDENCY_PREVIEW_LIMIT = 5
 
+/** 档位 emoji（manifest v2：appearance/utility/agentic） */
+const TIER_EMOJI: Record<string, string> = {
+  appearance: '🎨',
+  utility: '🔧',
+  agentic: '🤖',
+}
+
 function HostDependencyDiagnostics({
   findings,
   t,
@@ -350,6 +357,7 @@ export function MarketSection(props: MarketSectionProps) {
   const [qThemes, setQThemes] = useState('')
   const [qInstalled, setQInstalled] = useState('')
   const [cat, setCat] = useState('all')
+  const [tier, setTier] = useState('all')
   const [confirming, setConfirming] = useState<RegistryPlugin | null>(null)
   const [busyUrl, setBusyUrl] = useState<string | null>(null)
   /** Consecutive idle polls with a pending install that never landed (#32). */
@@ -754,13 +762,13 @@ export function MarketSection(props: MarketSectionProps) {
 
   const plugins = useMemo(
     () => (data === null ? [] : visiblePlugins(data.plugins, {
-      category: cat, query: q, lang,
+      category: cat, query: q, lang, tier,
       sort: `${sortField}-${sortDir}`,
       sinceDays: timeRange === 'all' ? undefined : TIME_RANGE_DAYS[timeRange],
     })),
-    [data, q, cat, lang, sortField, sortDir, timeRange])
+    [data, q, tier, cat, lang, sortField, sortDir, timeRange])
 
-  useEffect(() => { setPage(1) }, [q, cat, sortField, sortDir, timeRange])
+  useEffect(() => { setPage(1) }, [q, tier, cat, sortField, sortDir, timeRange])
 
   const totalPages = Math.max(1, Math.ceil(plugins.length / pageSize))
   // Clamp in case the list shrank while the user was on a later page.
@@ -1571,6 +1579,9 @@ export function MarketSection(props: MarketSectionProps) {
           </div>
         )}
         <div className={css.foot}>
+          <span className={`${css.tag} ${css.tierTag} ${p.tier === 'appearance' ? css.tierAppearance : p.tier === 'agentic' ? css.tierAgentic : css.tierUtility}`}>
+            {TIER_EMOJI[p.tier ?? 'utility'] ?? ''} {(data!.tiers && data!.tiers[p.tier ?? 'utility'] && (data!.tiers[p.tier ?? 'utility']![lang] || data!.tiers[p.tier ?? 'utility']!.en)) || (p.tier ?? 'utility')}
+          </span>
           <span className={css.tag}>
             {(data!.categories[p.category] && (data!.categories[p.category]![lang] || data!.categories[p.category]!.en)) || p.category}
           </span>
@@ -1735,8 +1746,9 @@ export function MarketSection(props: MarketSectionProps) {
     setVisibleCats(fits >= chips.length ? fits : Math.max(1, fits - 1))
   }, [catsOpen, visibleCats, data])
 
-  /** Installed plugins the market itself cannot group (#60). */
-  const groupableNames = Object.keys(installed).filter(name => name !== 'dsh-market' && name !== 'dshmarket' && name !== 'dshhub-market')
+  /** Installed plugins the market itself cannot group (#60); skill bundles
+   * (manifest v2) are plain directories, not toggleable loader entries. */
+  const groupableNames = Object.keys(installed).filter(name => !String(installed[name] ?? '').startsWith('skill:') && name !== 'dsh-market' && name !== 'dshmarket' && name !== 'dshhub-market')
   /** Names already inside some group; everything else shows under "ungrouped". */
   const groupedNames = useMemo(() => new Set(Object.values(groups).flat()), [groups])
   const ungroupedNames = groupableNames.filter(name => !groupedNames.has(name))
@@ -2110,6 +2122,19 @@ export function MarketSection(props: MarketSectionProps) {
                     <div className={css.tabSearchRow}>
                       <Input className={css.tabSearch} icon={<IconSearchOutline16 size={14} />} placeholder={t('searchPh')} value={q} onChange={e => setQ(e.target.value)} />
                     </div>
+                    {data.tiers !== undefined && (
+                      <div className={css.tiersRow}>
+                        <Pill data-chip="1" active={tier === 'all'} onClick={() => { setTier('all'); setCat('all'); }}>{t('all') + ' (' + formatCount(data.count) + ')'}</Pill>
+                        {Object.entries(data.tiers).map(([id, names]) => (
+                          <Pill
+                            key={id}
+                            data-chip="1"
+                            active={tier === id}
+                            onClick={() => { setTier(id); setCat('all'); }}
+                          >{TIER_EMOJI[id] ?? ''} {(names[lang] || names.en) || id}</Pill>
+                        ))}
+                      </div>
+                    )}
                     <div className={css.cats}>
                       <div className={css.catsRow}>
                       {/* The height cap belongs to the MEASURING pass only: that pass

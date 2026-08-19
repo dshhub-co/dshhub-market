@@ -40,6 +40,11 @@
 .stickyHead{position:sticky;top:-1px;z-index:5;background:var(--dsw-alias-bg-layer-2,#f7f8fa)}
 .stickyHead::before{content:'';position:absolute;left:0;right:0;bottom:100%;height:14px;background:inherit;pointer-events:none}
 .cats{padding:12px 4px 4px;margin:0 -4px 2px}
+.tiersRow{display:flex;gap:6px;flex-wrap:wrap;padding:0 4px 4px;margin:0 -4px}
+.tierTag{margin-right:6px}
+.tierTag.tierAppearance{border-color:rgba(167,139,250,.45);color:#7c5cd6}
+.tierTag.tierUtility{border-color:rgba(79,124,255,.45);color:#3b6fe0}
+.tierTag.tierAgentic{border-color:rgba(52,211,153,.5);color:#0e9f6e}
 .catsRow{display:flex;gap:8px;align-items:flex-start;position:relative}
 .star{font-size:11px;color:var(--dsw-alias-label-secondary,#9ca3af)}
 .top{position:absolute;right:18px;bottom:18px;z-index:20;display:inline-flex}

@@ -17,6 +17,8 @@ import { entryNeedsZip, materializeTgz } from './zip-source.ts'
 import { installTargetFor } from './sources.ts'
 import { runDshPlugin } from './dsh-cli.ts'
 import { readOwnVersion } from './self-update.ts'
+import { installSkill } from './skill-install.ts'
+import { profileDir } from './profile.ts'
 
 export const PORTS = [3750, 3751, 3752, 3753, 3754]
 const MAX_BODY = 64 * 1024
@@ -103,6 +105,15 @@ async function installEntry(body: Record<string, unknown>, profile: string): Pro
     if (entry === undefined) return { ok: false, error: '插件不在精选目录中' }
   } else {
     return { ok: false, error: '无效的插件 id' }
+  }
+  // manifest v2: skill packages copy into the profile skills dir, no pnpm.
+  if (entry.kind === 'skill') {
+    try {
+      const record = await installSkill(profileDir(profile), entry)
+      return { ok: true, message: `已安装技能包 ${entry.name}（${record.skills.join('、')} → profile skills 目录）` }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
   }
   const target = entryNeedsZip(entry) ? await materializeTgz(entry) : installTargetFor(entry)
   if (target === null) {

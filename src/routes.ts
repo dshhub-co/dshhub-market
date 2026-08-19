@@ -31,6 +31,7 @@ import { applyBundleOrder, mergeOrder, readBundleRules, readBundleStack, validat
 import { trialValidate } from './trial.ts'
 import { findInstalledAlias, gitAllowBuildsKey, installTargetFor } from './sources.ts'
 import { entryNeedsZip, materializeTgz } from './zip-source.ts'
+import { installSkill, isInstalledSkill, skillSpecMap, uninstallSkill, readInstalledSkills } from './skill-install.ts'
 import { isStaleUpdate, parseIgnoredBuilds, parsePrepareNotAllowed, RELEASE_AGE_OVERRIDE, retargetCollections, validateAddedPlugins, withHoistRecovery } from './install.ts'
 import { asChannel, CHANNELS, DIST_TAG, resolveChannel, type Channel } from './channels.ts'
 import { checkUpdates, fetchNpmLatest, invalidateUpdates, isLocalPathSpec, isUpgrade, latestPublishedRecently, versionOnChannel } from './updates.ts'
@@ -689,16 +690,22 @@ export function mountMarketRoutes(
           return
         }
         await dropStaleHotMounts()
-        const installed = readInstalled(config.profile, activeProfileDir)
+        // manifest v2: skill packages are directories under <profile>/skills/,
+        // not npm packages — merged into the same map with a `skill:` spec so
+        // the UI's install/uninstall/identity matching keeps working.
+        const skillSpecs = skillSpecMap(activeProfileDir)
+        const installed = { ...readInstalled(config.profile, activeProfileDir), ...skillSpecs }
         const repoIdentities: Record<string, string[]> = {}
         const repoHints: Record<string, string[]> = {}
         for (const [name, spec] of Object.entries(installed)) {
+          if (spec.startsWith('skill:')) continue
           const evidence = readInstalledRepoEvidence(config.profile, name, spec, activeProfileDir)
           if (evidence.identities.length > 0) repoIdentities[name] = evidence.identities
           if (evidence.hints.length > 0) repoHints[name] = evidence.hints
         }
         const present = Object.keys(installed).filter(
-          name => readInstalledVersion(config.profile, name, activeProfileDir) !== null,
+          name => installed[name].startsWith('skill:')
+            || readInstalledVersion(config.profile, name, activeProfileDir) !== null,
         )
         // User-patch-layer state (port of dsh-plugin-hub): rows the user
         // patch disables/force-enables, plus per-package flags so the UI can
@@ -709,8 +716,11 @@ export function mountMarketRoutes(
         const activation: Record<string, ReturnType<typeof verifyActivation>> = {}
         const live = liveNames()
         for (const name of Object.keys(installed)) {
-          activation[name] = verifyActivation(config.profile, name, live, activeProfileDir,
-            disabled.has(name) || patchFlags.disabled.includes(name))
+          activation[name] = installed[name].startsWith('skill:')
+            // Skills are plain directories, usable the moment they exist.
+            ? { state: 'live', reasons: ['技能包：已装入 profile skills 目录（不走 pnpm）'], bundle: false, hot: false }
+            : verifyActivation(config.profile, name, live, activeProfileDir,
+                disabled.has(name) || patchFlags.disabled.includes(name))
         }
         const diagnostics = diagnosePackageManifests(Object.keys(installed).map(packageName => ({
           packageName,
@@ -1803,6 +1813,21 @@ export function mountMarketRoutes(
               })
               return
             }
+            // manifest v2: skill packages uninstall by removing their dirs.
+            if (isInstalledSkill(activeProfileDir, name)) {
+              const record = readInstalledSkills(activeProfileDir)[name]
+              const removed = uninstallSkill(activeProfileDir, name)
+              logEvent(removed ? 'info' : 'error', 'uninstall',
+                `${name}: skill bundle ${removed ? `removed (${record?.skills.join(', ') ?? ''})` : 'not found'}`)
+              sendJson(response, removed ? 200 : 400, {
+                ok: removed,
+                // Directory removal is immediate — no restart banner needed.
+                hot: true,
+                skill: record,
+                installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir) },
+              })
+              return
+            }
             pendingRollbacks.clear()
             const beforeInstalled = readInstalled(config.profile, activeProfileDir)
             // isDisabled comes from the patch layer (#130) — keep it while the
@@ -1961,6 +1986,30 @@ export function mountMarketRoutes(
             if (entry === undefined) {
               logEvent('warn', 'install-rejected', `not in curated registry: ${url.slice(0, 120)}`)
               sendJson(response, 400, { error: 'plugin is not in the curated registry' })
+              return
+            }
+            // manifest v2: skill packages install as plain directories under
+            // <profile>/skills/ — they are NOT npm packages, so they never go
+            // through pnpm. The registry allowlist check above still applies.
+            if (entry.kind === 'skill') {
+              try {
+                const record = await installSkill(activeProfileDir, entry)
+                logEvent('info', 'install', `${entry.name}: skill bundle installed (${record.skills.join(', ')})`)
+                sendJson(response, 200, {
+                  ok: true,
+                  // Skills are plain directories — usable immediately, no
+                  // restart, so they report as hot-mounted.
+                  hot: true,
+                  skill: record,
+                  activation: {
+                    [record.name]: { state: 'live', reasons: ['技能包：已装入 profile skills 目录（不走 pnpm）'], bundle: false, hot: false },
+                  },
+                  installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir) },
+                })
+              } catch (error) {
+                logEvent('error', 'install', `${entry.name}: skill install failed: ${error instanceof Error ? error.message : String(error)}`)
+                sendJson(response, 502, { error: error instanceof Error ? error.message : String(error) })
+              }
               return
             }
             // fork: zip-hosted entries (no npm/github source) materialize a

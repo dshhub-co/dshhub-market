@@ -1254,7 +1254,7 @@ export function mountMarketRoutes(
               if (refuse) {
                 logEvent('info', 'update', `${name} refused: published=${remoteVersion} is not newer than installed=${installedVersion}`)
                 sendJson(response, 400, {
-                  error: `已是最新：dshhub.co 发布的最新版本是 ${remoteVersion}，不高于已装的 ${installedVersion}，更新会造成降级。 / Already current: the latest published version (${remoteVersion}) is not newer than the installed ${installedVersion}, so updating would downgrade it.`,
+                  error: `已是最新：dshhub.co 发布的最新版本是 ${remoteVersion}，不高于已装的 ${installedVersion}，更新会造成降级。如果你在界面上看到的版本比这个旧，说明更新文件已装好、DSH 还没重启——重启 DeepSeek Harness 后新版本即生效。 / Already current: the latest published version (${remoteVersion}) is not newer than the installed ${installedVersion}, so updating would downgrade it. If the version you see in the UI is older than this, the update files are already in place and DSH just needs a restart to run them.`,
                 })
                 return
               }

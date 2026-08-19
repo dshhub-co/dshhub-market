@@ -37,11 +37,15 @@
    ::before paints that strip in the same background and inherits the row's
    z-index, so the row covers what it cannot reach. Fixing it by removing the
    scroller's padding would re-space all five tabs to repair one. */
-/* 右下角商城入口（shell.overlay 悬浮按钮，z-index 低于宿主弹层） */
-.fab{position:fixed;right:20px;bottom:20px;z-index:500;width:48px;height:48px;border-radius:999px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,#4f7cff,#7c3aed);box-shadow:0 6px 18px rgba(76,110,255,.35);transition:transform .15s ease,box-shadow .15s ease}
+/* 左下角插件市场入口（shell.overlay 悬浮胶囊，位于侧边栏设置按钮上方；
+   z-index 低于宿主弹层，设置对话框打开时会被遮住） */
+.fab{position:fixed;left:16px;bottom:72px;z-index:500;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#fff;background:linear-gradient(135deg,#4f7cff,#7c3aed);box-shadow:0 6px 18px rgba(76,110,255,.35);transition:transform .15s ease,box-shadow .15s ease}
 .fab:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(76,110,255,.45)}
 .fab:active{transform:translateY(0)}
-.fabBody{width:min(960px,94vw);height:min(78vh,760px);overflow:auto;display:flex;flex-direction:column}
+.fabLabel{font-size:13px;font-weight:600;white-space:nowrap}
+/* 市场面板弹层：加宽（默认卡片窄，长文本显示不全），内容区独立滚动 */
+.fabModalCard{width:min(960px,94vw)!important;max-width:96vw!important}
+.fabModalBody{height:min(78vh,720px);overflow:auto;display:flex;flex-direction:column}
 .stickyHead{position:sticky;top:-1px;z-index:5;background:var(--dsw-alias-bg-layer-2,#f7f8fa)}
 .stickyHead::before{content:'';position:absolute;left:0;right:0;bottom:100%;height:14px;background:inherit;pointer-events:none}
 .cats{padding:12px 4px 4px;margin:0 -4px 2px}

@@ -3,6 +3,7 @@
 export const zh = {
   nav: 'DSHHub.co 市场',
   fabTitle: '打开插件市场',
+  fabLabel: '插件市场',
   fabModalTitle: 'DSHHub 插件市场',
   setCardDesc: '查看版本、更新或移除插件市场。',
   setSelfUpToDate: '已是最新版本',
@@ -326,6 +327,7 @@ export type MarketKey = keyof typeof zh
 export const en: Record<MarketKey, string> = {
   nav: 'DSHHub.co Market',
   fabTitle: 'Open plugin market',
+  fabLabel: 'Plugin Market',
   fabModalTitle: 'DSHHub Plugin Market',
   setCardDesc: 'See the version, update, or remove the plugin market.',
   setSelfUpToDate: 'Up to date',

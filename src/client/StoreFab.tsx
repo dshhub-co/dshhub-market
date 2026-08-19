@@ -1,7 +1,8 @@
 /**
- * 右下角商城入口（shell.overlay）：DSH 主页右下角的悬浮按钮，
- * 点击弹出内嵌的市场面板——复用设置页同一个 MarketSection，
- * 搜索、三档分类、一键安装都在，不依赖宿主打开设置对话框的 API。
+ * 左下角插件市场入口（shell.overlay）：购物车图标 + 「插件市场」文字胶囊，
+ * 悬浮在侧边栏设置按钮上方（host 的 sidebar 槽全是 single 槽，插件不能往
+ * 设置上方塞真正的侧边栏条目，悬浮胶囊是官方 shell.overlay 通道下的等价物）。
+ * 点击弹出内嵌的市场面板——复用设置页同一个 MarketSection。
  */
 import { useState, type ComponentProps } from 'react'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -15,21 +16,13 @@ export interface StoreFabDeps {
   market: Omit<ComponentProps<typeof MarketSection>, 't'>
 }
 
-/** 与设置页头部一致的市场图形标（官方风格单色，fill=currentColor）。 */
-function MarketGlyph({ size = 18 }: { size?: number }) {
+/** 购物车图标（线性描边，fill=currentColor 风格，随主题变色） */
+function CartIcon({ size = 18 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <g fill="currentColor">
-        <rect x="1.96" y="3.36" width="3.3" height="3.3" rx="0.53" />
-        <rect x="5.71" y="3.36" width="3.3" height="3.3" rx="0.53" />
-        <rect x="1.96" y="7.11" width="3.3" height="3.3" rx="0.53" />
-        <rect x="5.71" y="7.11" width="3.3" height="3.3" rx="0.53" />
-        <rect x="9.46" y="7.11" width="3.3" height="3.3" rx="0.53" />
-        <rect x="1.96" y="10.86" width="3.3" height="3.3" rx="0.53" />
-        <rect x="5.71" y="10.86" width="3.3" height="3.3" rx="0.53" />
-        <rect x="9.46" y="10.86" width="3.3" height="3.3" rx="0.53" />
-      </g>
-      <rect x="10.74" y="2.09" width="3.3" height="3.3" rx="0.53" fill="currentColor" transform="rotate(9 12.39 3.74)" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="20" r="1.4" />
+      <circle cx="17" cy="20" r="1.4" />
+      <path d="M3 4h2l2.6 11.4a1.5 1.5 0 0 0 1.5 1.1h8.9a1.5 1.5 0 0 0 1.5-1.2L21 8H6" />
     </svg>
   )
 }
@@ -44,17 +37,18 @@ export function StoreFab({ t, market }: StoreFabDeps) {
         aria-label={t('fabTitle')}
         onClick={() => setOpen(true)}
       >
-        <MarketGlyph />
+        <CartIcon />
+        <span className={css.fabLabel}>{t('fabLabel')}</span>
       </button>
       {open && (
         <Modal
           open
           onClose={() => setOpen(false)}
           title={t('fabModalTitle')}
+          className={css.fabModalCard}
+          contentClassName={css.fabModalBody}
         >
-          <div className={css.fabBody}>
-            <MarketSection t={t} {...market} />
-          </div>
+          <MarketSection t={t} {...market} />
         </Modal>
       )}
     </>

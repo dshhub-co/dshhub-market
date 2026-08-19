@@ -1,10 +1,10 @@
 /** zh/en dictionaries for the Market settings section and install toast. */
 
 export const zh = {
-  nav: 'DSHHub.co 市场',
-  fabTitle: '打开插件市场',
-  fabLabel: '插件市场',
-  fabModalTitle: 'DSHHub 插件市场',
+  nav: 'dshhub.co 市场',
+  fabTitle: '打开 dshhub.co 插件市场',
+  fabLabel: 'dshhub.co 插件市场',
+  fabModalTitle: 'dshhub.co 插件市场',
   setCardDesc: '查看版本、更新或移除插件市场。',
   setSelfUpToDate: '已是最新版本',
   setSelfUpdateReady: '有新版本',
@@ -34,7 +34,7 @@ export const zh = {
   setSelfRemovedHint: '重启 DeepSeek Harness 后完全清理。',
   setSelfFailed: '操作失败',
   versionHint: '插件市场版本 — 反馈问题时请附上',
-  subtitle: '发现 DSHHub.co 与社区为 DeepSeek Harness 打造的插件',
+  subtitle: '发现 dshhub.co 与社区为 DeepSeek Harness 打造的插件',
   searchPh: '搜索插件，比如：通知、终端、记忆…',
   tabDiscover: '发现',
   tabInstalled: '已安装',
@@ -325,10 +325,10 @@ export const zh = {
 export type MarketKey = keyof typeof zh
 
 export const en: Record<MarketKey, string> = {
-  nav: 'DSHHub.co Market',
-  fabTitle: 'Open plugin market',
-  fabLabel: 'Plugin Market',
-  fabModalTitle: 'DSHHub Plugin Market',
+  nav: 'dshhub.co Market',
+  fabTitle: 'Open dshhub.co plugin market',
+  fabLabel: 'dshhub.co Plugin Market',
+  fabModalTitle: 'dshhub.co Plugin Market',
   setCardDesc: 'See the version, update, or remove the plugin market.',
   setSelfUpToDate: 'Up to date',
   setSelfUpdateReady: 'New version available:',
@@ -358,7 +358,7 @@ export const en: Record<MarketKey, string> = {
   setSelfRemovedHint: 'Restart DeepSeek Harness to finish cleaning up.',
   setSelfFailed: 'The operation failed',
   versionHint: 'Plugin market version — include it when reporting an issue',
-  subtitle: 'Discover DSHHub.co and community plugins for DeepSeek Harness',
+  subtitle: 'Discover dshhub.co and community plugins for DeepSeek Harness',
   searchPh: 'Search plugins: notify, terminal, memory…',
   tabDiscover: 'Discover',
   tabInstalled: 'Installed',

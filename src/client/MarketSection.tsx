@@ -1552,7 +1552,7 @@ export function MarketSection(props: MarketSectionProps) {
           <div style={{ minWidth: 0 }}>
             <div className={css.nm} title={p.name}>
               {pluginName(p.name)}
-              {p.host === 'dshhub' && <span className={css.depBadge}>DSHHub 上架</span>}
+              {p.host === 'dshhub' && <span className={css.depBadge}>dshhub.co 上架</span>}
               {p.deprecated === true && <span className={css.depBadge}>{t('deprecatedBadge')}</span>}
             </div>
             <div className={css.byline}>
@@ -1654,7 +1654,7 @@ export function MarketSection(props: MarketSectionProps) {
           <div style={{ minWidth: 0 }}>
             <div className={css.nm} title={p.name}>
               {pluginName(p.name)}
-              {p.host === 'dshhub' && <span className={css.depBadge}>DSHHub 上架</span>}
+              {p.host === 'dshhub' && <span className={css.depBadge}>dshhub.co 上架</span>}
               {p.deprecated === true && <span className={css.depBadge}>{t('deprecatedBadge')}</span>}
             </div>
             <div className={css.byline}>

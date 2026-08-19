@@ -3,9 +3,12 @@
  * 悬浮在侧边栏设置按钮上方（host 的 sidebar 槽全是 single 槽，插件不能往
  * 设置上方塞真正的侧边栏条目，悬浮胶囊是官方 shell.overlay 通道下的等价物）。
  * 点击弹出内嵌的市场面板——复用设置页同一个 MarketSection。
+ *
+ * 弹层用 headless Modal：卡片内部全由自己排版（默认 chrome 的内容区会挤压
+ * MarketSection 的网格，出现过安装按钮文字溢出卡片的情况）。
  */
 import { useState, type ComponentProps } from 'react'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconCloseOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './Market.module.css'
 import { MarketSection } from './MarketSection.tsx'
 import type { Translate } from './market-data.ts'
@@ -45,10 +48,23 @@ export function StoreFab({ t, market }: StoreFabDeps) {
           open
           onClose={() => setOpen(false)}
           title={t('fabModalTitle')}
+          closeLabel={t('fabModalTitle')}
+          headless
           className={css.fabModalCard}
-          contentClassName={css.fabModalBody}
         >
-          <MarketSection t={t} {...market} />
+          <div className={css.fabModalHead}>
+            <span className={css.fabModalTitle}>{t('fabModalTitle')}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<IconCloseOutline16 size={16} />}
+              aria-label={t('fabModalTitle')}
+              onClick={() => setOpen(false)}
+            />
+          </div>
+          <div className={css.fabModalPanel}>
+            <MarketSection t={t} {...market} />
+          </div>
         </Modal>
       )}
     </>

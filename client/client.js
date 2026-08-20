@@ -668,6 +668,32 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 		};
 		//#endregion
 		//#region src/client/market-data.ts
+		/**
+		* 目录缓存（stale-while-revalidate）：市场每次打开都会整量拉取 1MB+ 的目录，
+		* 行业标准做法是先渲染上次的缓存、后台再刷新。模块级缓存只活到页面关闭，
+		* sessionStorage 里的这份让「重开 DSH 网页」也秒开。
+		*/
+		const REGISTRY_CACHE_KEY = "dshm-registry-v1";
+		const REGISTRY_CACHE_TTL = 18e5;
+		function readRegistryCache() {
+			try {
+				const raw = sessionStorage.getItem(REGISTRY_CACHE_KEY);
+				if (raw === null) return null;
+				const parsed = JSON.parse(raw);
+				if (typeof parsed?.at !== "number" || Date.now() - parsed.at > REGISTRY_CACHE_TTL) return null;
+				return Array.isArray(parsed.data?.plugins) ? parsed.data : null;
+			} catch {
+				return null;
+			}
+		}
+		function writeRegistryCache(registry) {
+			try {
+				sessionStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
+					at: Date.now(),
+					data: registry
+				}));
+			} catch {}
+		}
 		function groupSwitchState(members, disabled) {
 			const list = members ?? [];
 			if (list.length === 0) return "empty";
@@ -2627,7 +2653,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			const localeSnap = (0, react.useSyncExternalStore)((cb) => props.locale.subscribe(cb), () => props.locale.getSnapshot());
 			const lang = String(localeSnap.active).toLowerCase().startsWith("zh") ? "zh" : "en";
 			const themeSnap = (0, react.useSyncExternalStore)(props.themeStore.subscribe, props.themeStore.getSnapshot);
-			const [data, setData] = (0, react.useState)(cachedRegistry);
+			const [data, setData] = (0, react.useState)(cachedRegistry ?? readRegistryCache());
 			const [loadError, setLoadError] = (0, react.useState)(null);
 			const [installed, setInstalledState] = (0, react.useState)(cachedInstalled ?? {});
 			const setInstalled = (0, react.useCallback)((value) => {
@@ -2870,6 +2896,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				}).then((body) => {
 					if (body.registry === void 0) throw new Error("the catalog response carried no data");
 					cachedRegistry = body.registry;
+					writeRegistryCache(body.registry);
 					setData(body.registry);
 					setLoadError(null);
 				}).catch((error) => {

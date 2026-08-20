@@ -57,6 +57,34 @@ export interface Registry {
   plugins: RegistryPlugin[]
 }
 
+/**
+ * 目录缓存（stale-while-revalidate）：市场每次打开都会整量拉取 1MB+ 的目录，
+ * 行业标准做法是先渲染上次的缓存、后台再刷新。模块级缓存只活到页面关闭，
+ * sessionStorage 里的这份让「重开 DSH 网页」也秒开。
+ */
+const REGISTRY_CACHE_KEY = 'dshm-registry-v1'
+const REGISTRY_CACHE_TTL = 30 * 60 * 1000
+
+export function readRegistryCache(): Registry | null {
+  try {
+    const raw = sessionStorage.getItem(REGISTRY_CACHE_KEY)
+    if (raw === null) return null
+    const parsed = JSON.parse(raw) as { at?: number; data?: Registry }
+    if (typeof parsed?.at !== 'number' || Date.now() - parsed.at > REGISTRY_CACHE_TTL) return null
+    return Array.isArray(parsed.data?.plugins) ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+export function writeRegistryCache(registry: Registry): void {
+  try {
+    sessionStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({ at: Date.now(), data: registry }))
+  } catch {
+    // 存储不可用/超限：静默降级为仅内存缓存
+  }
+}
+
 /** Profile dependency map: package name → install spec. */
 export type InstalledMap = Record<string, string>
 

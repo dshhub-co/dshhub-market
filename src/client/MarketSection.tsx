@@ -36,7 +36,7 @@ import css from './Market.module.css'
 import { Diagnostics } from './Diagnostics.tsx'
 import {
   avatarColor, entryForDep, groupSwitchState, humanOutput, isInstalled, looksTerminal, matchInstalledName, orderedCategories,
-  formatCount, pageItems, pluginName, pluginScreenshots, readSession, themePlugins as themePluginsOf, themeSwatch, TIME_RANGE_DAYS, visiblePlugins,
+  formatCount, pageItems, pluginName, pluginScreenshots, readRegistryCache, readSession, themePlugins as themePluginsOf, themeSwatch, TIME_RANGE_DAYS, visiblePlugins, writeRegistryCache,
 } from './market-data.ts'
 import type {
 ActivationInfo, ActivationState, GistExportResult, InstalledMap, InstalledRepoHints, InstalledRepoIdentities, MarketStatus, Registry, RegistryPlugin,
@@ -331,7 +331,7 @@ export function MarketSection(props: MarketSectionProps) {
     props.themeStore.subscribe,
     props.themeStore.getSnapshot,
   )
-  const [data, setData] = useState<Registry | null>(cachedRegistry)
+  const [data, setData] = useState<Registry | null>(cachedRegistry ?? readRegistryCache())
   const [loadError, setLoadError] = useState<string | null>(null)
   const [installed, setInstalledState] = useState<InstalledMap>(cachedInstalled ?? {})
   const setInstalled = useCallback((value: InstalledMap) => { cachedInstalled = value; setInstalledState(value) }, [])
@@ -598,6 +598,7 @@ export function MarketSection(props: MarketSectionProps) {
       .then((body) => {
         if (body.registry === undefined) throw new Error('the catalog response carried no data')
         cachedRegistry = body.registry
+        writeRegistryCache(body.registry)
         setData(body.registry)
         setLoadError(null)
       })

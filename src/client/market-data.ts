@@ -104,6 +104,8 @@ export interface GistExportResult {
 /** Per-package update status from /dsh-market/updates. */
 export interface UpdateStatus {
   updateAvailable?: boolean
+  /** 更新存在但处于新版本观察期（发布不满一天），暂不提供更新按钮。 */
+  ageGated?: boolean
   version?: string
   kind?: string
 }
@@ -127,6 +129,8 @@ export interface MarketStatus {
   size?: number | null
   /** True once the user asked to cancel and the host is killing the run. */
   cancelling?: boolean
+  /** Whether a self-restart may be offered (detached restart safe in this host). */
+  restart?: boolean
   /**
    * The route-level operation lock (#91): stays true through install
    * post-processing after pnpm already exited (progress.active false).

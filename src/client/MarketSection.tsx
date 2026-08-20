@@ -580,6 +580,23 @@ export function MarketSection(props: MarketSectionProps) {
       .catch(() => {})
   }, [])
 
+  // 周期性状态刷新：市场自更新替换的是磁盘上的包，运行中的进程不重启读不到
+  // 自己的新版本号；状态路由已改为报「实际已安装」的版本，这里 30 秒拉一次，
+  // 头部版本号在更新完成后自动跟上，不用重开设置页。
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetch('/dsh-market/status', { cache: 'no-store' })
+        .then(res => res.json())
+        .then((status: MarketStatus) => {
+          if (typeof status.version === 'string' && status.version !== '') setVersion(status.version)
+          if (typeof status.restart === 'boolean') setRestartEnabled(status.restart)
+          setEnvReady(status.pnpm !== false)
+        })
+        .catch(() => {})
+    }, 30_000)
+    return () => clearInterval(timer)
+  }, [setVersion, setRestartEnabled, setEnvReady])
+
   /** Lookup set for the persisted disable list (#60). */
   const disabledSet = useMemo(() => new Set(disabledNames), [disabledNames])
   /** Effective switch state: market disable list ∪ user-patch-layer disables. */

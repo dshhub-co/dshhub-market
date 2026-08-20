@@ -1118,7 +1118,9 @@ export function mountMarketRoutes(
           boot: BOOT_ID,
           agentGuardAvailable: agentsGuardAvailable(),
           // Shown in the page heading so screenshots carry it (#159).
-          version: marketVersion(),
+          // 自更新替换的是磁盘上的包，运行中代码的 marketVersion() 会停在旧值；
+          // 状态路由改报「实际已安装」的版本，更新完成无需重启头部即可跟上。
+          version: readInstalledVersion(config.profile, FORK_SELF_NAME, activeProfileDir) ?? marketVersion(),
           channel: activeChannel(),
           channels: CHANNELS,
           restart: restartAllowed(config),

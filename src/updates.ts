@@ -20,6 +20,13 @@ export interface UpdateStatus {
    */
   updateAvailable: boolean
   /**
+   * A newer version exists but is inside pnpm's fresh-release window
+   * (published < 26h): the offer is suppressed until it ages out, because
+   * installing it NOW usually "succeeds" without changing the version —
+   * mirrors have not finished propagating the new tarball.
+   */
+  ageGated?: boolean
+  /**
    * The version this package's channel points at, when it differs from what
    * is installed and is NOT newer.
    *
@@ -271,9 +278,19 @@ export async function checkUpdates(
         const upgrade = isUpgrade(version, latest)
         const sideways = channel !== undefined && !upgrade
           && version !== null && latest !== null && version !== latest
+        // Release-age gate on the OFFER side (the route has had one since
+        // #45): a just-published release is not offered — mirrors lag, the
+        // install "succeeds" with the version unchanged, and the user is
+        // left reading a confusing error for something that is not really
+        // an update yet. `ageGated` records it so the UI can explain later.
+        let ageGated = false
+        if (upgrade) {
+          ageGated = (await latestPublishedRecently(name)) === true
+        }
         result[name] = {
           kind: 'npm', version, current: version, latest,
-          updateAvailable: upgrade,
+          updateAvailable: upgrade && !ageGated,
+          ...(ageGated ? { ageGated: true } : {}),
           ...(sideways ? { channelSwitch: latest } : {}),
         }
       }

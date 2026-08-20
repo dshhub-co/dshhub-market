@@ -2885,6 +2885,20 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				}).catch(() => {});
 				fetch("/dsh-market/updates" + (force === true ? "?force=1" : ""), { cache: "no-store" }).then((res) => res.json()).then((body) => setUpdates(body.updates || {})).catch(() => {});
 			}, []);
+			(0, react.useEffect)(() => {
+				const timer = setInterval(() => {
+					fetch("/dsh-market/status", { cache: "no-store" }).then((res) => res.json()).then((status) => {
+						if (typeof status.version === "string" && status.version !== "") setVersion(status.version);
+						if (typeof status.restart === "boolean") setRestartEnabled(status.restart);
+						setEnvReady(status.pnpm !== false);
+					}).catch(() => {});
+				}, 3e4);
+				return () => clearInterval(timer);
+			}, [
+				setVersion,
+				setRestartEnabled,
+				setEnvReady
+			]);
 			(0, react.useMemo)(() => new Set(disabledNames), [disabledNames]);
 			/** Effective switch state: market disable list ∪ user-patch-layer disables. */
 			const effectiveDisabledSet = (0, react.useMemo)(() => /* @__PURE__ */ new Set([...disabledNames, ...patchDisabledNames]), [disabledNames, patchDisabledNames]);

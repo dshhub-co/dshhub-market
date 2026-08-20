@@ -46,6 +46,12 @@ export interface RegistryPlugin {
   tier?: string
   /** manifest v2: SPDX license id or common license name (dshhub entries). */
   license?: string
+  /** fork (dshhub): paid entry — needs a License; download requires a token. */
+  paid?: boolean
+  /** fork (dshhub): sale price for paid entries. */
+  price?: number
+  /** fork (dshhub): price currency (default CNY). */
+  paidCurrency?: string
 }
 
 /** The catalog payload under `registry` in /dsh-market/registry. */

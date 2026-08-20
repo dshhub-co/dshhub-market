@@ -48,6 +48,16 @@ export interface RegistryPlugin {
   tier?: string
   /** manifest v2: SPDX license id or common license name (dshhub entries). */
   license?: string
+  /**
+   * fork (dshhub): paid entry — needs a valid License to download; the zip
+   * URL (dshhub.co/api/download/<id>) returns 401/403 without an
+   * Authorization: Bearer <dshhub session token> header.
+   */
+  paid?: boolean
+  /** fork (dshhub): sale price for paid entries. */
+  price?: number
+  /** fork (dshhub): price currency (default CNY). */
+  paidCurrency?: string
 }
 
 export interface Registry {

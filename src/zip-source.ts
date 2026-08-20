@@ -150,16 +150,29 @@ function ensurePackageJson(rooted: Record<string, Uint8Array>, manifest: Manifes
  * Materialize the entry's zip into a cached tarball path for `dsh plugin add`.
  * Content-addressed: the same zip maps to the same file, a new version maps
  * to a new one (which cleanly replaces the old file: spec in the profile).
+ *
+ * `opts.token` — dshhub session access token (paid-marketplace-design.md
+ * §4.3 方式 B): passed as `Authorization: Bearer` so the download endpoint
+ * can verify the License for paid entries. Free entries ignore it.
  */
-export async function materializeTgz(entry: RegistryPlugin): Promise<string> {
+export async function materializeTgz(
+  entry: RegistryPlugin,
+  opts?: { token?: string },
+): Promise<string> {
   const zipUrl = entry.zip as string
   let zipBytes: Buffer
   try {
-    const response = await marketFetch(zipUrl, { signal: AbortSignal.timeout(180_000) })
+    const headers: Record<string, string> = {}
+    if (opts?.token) headers['Authorization'] = `Bearer ${opts.token}`
+    const response = await marketFetch(zipUrl, { signal: AbortSignal.timeout(180_000), headers })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     zipBytes = Buffer.from(await response.arrayBuffer())
   } catch (error) {
-    throw new Error(`下载插件包失败（${zipUrl}）：${error instanceof Error ? error.message : String(error)}`)
+    const paid = entry.paid === true
+    const hint = paid
+      ? '（付费插件：请在 dshhub.co 购买并登录后，通过网页「一键安装」按钮安装）'
+      : ''
+    throw new Error(`下载插件包失败（${zipUrl}）：${error instanceof Error ? error.message : String(error)}${hint}`)
   }
   if (zipBytes.byteLength < 22) throw new Error('插件包无效（空文件）')
 

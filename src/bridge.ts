@@ -88,13 +88,16 @@ interface InstallOutcome {
 
 /**
  * Install a catalog entry into the given profile. Two request shapes:
- *  - `{ id }`  — a dshhub-uploaded plugin (uuid lookup);
+ *  - `{ id, token? }`  — a dshhub-uploaded plugin (uuid lookup); `token` is
+ *    the dshhub session access token the website passes for PAID plugins so
+ *    the zip download can verify the License (paid-marketplace-design.md §4.3).
  *  - `{ url }` — a curated registry entry (must match the registry allowlist
- *               exactly, same rule as the market's own install route).
+ *    exactly, same rule as the market's own install route).
  */
 async function installEntry(body: Record<string, unknown>, profile: string): Promise<InstallOutcome> {
   const id = body?.id
   const url = body?.url
+  const token = typeof body?.token === 'string' && body.token !== '' ? body.token : undefined
   const registry = await loadRegistry()
   let entry = undefined
   if (typeof id === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(id)) {
@@ -106,6 +109,9 @@ async function installEntry(body: Record<string, unknown>, profile: string): Pro
   } else {
     return { ok: false, error: '无效的插件 id' }
   }
+  if (entry.paid === true && !token) {
+    return { ok: false, error: '付费插件需要 dshhub.co 登录态：请先在网站上购买，再点「一键安装」' }
+  }
   // manifest v2: skill packages copy into the profile skills dir, no pnpm.
   if (entry.kind === 'skill') {
     try {
@@ -115,7 +121,7 @@ async function installEntry(body: Record<string, unknown>, profile: string): Pro
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   }
-  const target = entryNeedsZip(entry) ? await materializeTgz(entry) : installTargetFor(entry)
+  const target = entryNeedsZip(entry) ? await materializeTgz(entry, { token }) : installTargetFor(entry)
   if (target === null) {
     return { ok: false, error: '不支持的来源' }
   }

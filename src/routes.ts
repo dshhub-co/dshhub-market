@@ -2017,6 +2017,15 @@ export function mountMarketRoutes(
             // fork: zip-hosted entries (no npm/github source) materialize a
             // tarball first; everything else maps through the standard source
             // resolution. The allowlist check above still applies to both.
+            // fork (paid-marketplace-design.md): paid entries carry no usable
+            // anonymous zip — the website's one-click install (bridge) passes
+            // the dshhub session token instead.
+            if (entry.paid === true) {
+              sendJson(response, 402, {
+                error: '付费插件请先在 dshhub.co 购买，然后通过网站页面的「一键安装」按钮安装（需登录）',
+              })
+              return
+            }
             let target: string | null
             try {
               target = entryNeedsZip(entry) ? await materializeTgz(entry) : installTargetFor(entry)

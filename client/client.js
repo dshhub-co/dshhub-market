@@ -159,6 +159,9 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			marketUpdate: "升级市场",
 			updateAll: "全部更新",
 			tabThemes: "主题",
+			tabAppearance: "外观与体验",
+			tabUtility: "工具与能力",
+			tabAgentic: "智能体与技能",
 			tabBackup: "备份与恢复",
 			backupLocal: "本地文件",
 			backupDownload: "导出备份",
@@ -476,6 +479,9 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			marketUpdate: "Update market",
 			updateAll: "Update all",
 			tabThemes: "Themes",
+			tabAppearance: "Appearance & Experience",
+			tabUtility: "Tools & Capabilities",
+			tabAgentic: "Agents & Skills",
 			tabBackup: "Backup & Restore",
 			backupLocal: "Local file",
 			backupDownload: "Export backup",
@@ -783,10 +789,6 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			if (options.sort === "added-desc") return [...list].sort((a, b) => String(b.added).localeCompare(String(a.added)));
 			if (options.sort === "added-asc") return [...list].sort((a, b) => String(a.added).localeCompare(String(b.added)));
 			return list;
-		}
-		/** The themes tab listing: theme category only, most-starred first. */
-		function themePlugins(plugins) {
-			return plugins.filter((p) => p.category === "theme").sort((a, b) => (b.stars || 0) - (a.stars || 0));
 		}
 		/**
 		* Category chip order: collapsed with an active non-'all' chip that would
@@ -2326,6 +2328,17 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			utility: "🔧",
 			agentic: "🤖"
 		};
+		/** 顶层三档标签卡的顺序与本地化键 */
+		const TIER_TAB_IDS = [
+			"appearance",
+			"utility",
+			"agentic"
+		];
+		const TIER_TAB_KEYS = {
+			appearance: "tabAppearance",
+			utility: "tabUtility",
+			agentic: "tabAgentic"
+		};
 		function HostDependencyDiagnostics({ findings, t }) {
 			if (findings.length === 0) return null;
 			const preview = findings.slice(0, HOST_DEPENDENCY_PREVIEW_LIMIT);
@@ -2675,14 +2688,13 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			const [tab, setTab] = (0, react.useState)(() => {
 				const saved = sessionStorage.getItem("dshm-tab");
 				if (saved !== null) sessionStorage.removeItem("dshm-tab");
-				return saved || "discover";
+				const value = saved || "discover";
+				return value === "themes" ? "appearance" : value;
 			});
 			const [q, setQ] = (0, react.useState)("");
-			/** Per-tab searches stay independent: discover / themes / installed. */
-			const [qThemes, setQThemes] = (0, react.useState)("");
+			/** Per-tab searches stay independent: catalog tabs / installed. */
 			const [qInstalled, setQInstalled] = (0, react.useState)("");
 			const [cat, setCat] = (0, react.useState)("all");
-			const [tier, setTier] = (0, react.useState)("all");
 			const [confirming, setConfirming] = (0, react.useState)(null);
 			const [busyUrl, setBusyUrl] = (0, react.useState)(null);
 			/** Consecutive idle polls with a pending install that never landed (#32). */
@@ -3047,17 +3059,18 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				repoHints,
 				refreshInstalled
 			]);
-			const plugins = (0, react.useMemo)(() => data === null ? [] : visiblePlugins(data.plugins, {
+			const activeTier = tab === "discover" ? "all" : tab === "appearance" || tab === "utility" || tab === "agentic" ? tab : null;
+			const plugins = (0, react.useMemo)(() => data === null || activeTier === null ? [] : visiblePlugins(data.plugins, {
 				category: cat,
 				query: q,
 				lang,
-				tier,
+				tier: activeTier,
 				sort: `${sortField}-${sortDir}`,
 				sinceDays: timeRange === "all" ? void 0 : TIME_RANGE_DAYS[timeRange]
 			}), [
 				data,
 				q,
-				tier,
+				activeTier,
 				cat,
 				lang,
 				sortField,
@@ -3068,7 +3081,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				setPage(1);
 			}, [
 				q,
-				tier,
+				activeTier,
 				cat,
 				sortField,
 				sortDir,
@@ -3157,7 +3170,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 					sessionStorage.removeItem("dshm-pending");
 					if (status === 200 && body.ok && body.hot && plugin.category === "theme") {
 						sessionStorage.setItem("dshm-toast", JSON.stringify([plugin.name]));
-						sessionStorage.setItem("dshm-tab", "themes");
+						sessionStorage.setItem("dshm-tab", "appearance");
 						location.reload();
 						return;
 					}
@@ -3335,7 +3348,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 					if (status === 200 && body.ok) {
 						sessionStorage.setItem("dshm-toast", JSON.stringify([name]));
 						sessionStorage.setItem("dshm-toast-mode", "theme");
-						sessionStorage.setItem("dshm-tab", "themes");
+						sessionStorage.setItem("dshm-tab", "appearance");
 						location.reload();
 					} else setInstallError(String(body.error || "failed"));
 				}).catch((error) => setInstallError(String(error)));
@@ -3397,7 +3410,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 						if (reload) {
 							sessionStorage.removeItem("dshm-toast");
 							sessionStorage.removeItem("dshm-toast-mode");
-							sessionStorage.setItem("dshm-tab", "themes");
+							sessionStorage.setItem("dshm-tab", "appearance");
 							location.reload();
 						}
 					} else {
@@ -3820,20 +3833,6 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				else if (id.startsWith("dir:")) setSortDir(id.slice(4));
 				else if (id.startsWith("time:")) setTimeRange(id.slice(5));
 			};
-			const themePlugins$1 = data === null ? [] : themePlugins(data.plugins);
-			/** Themes-tab search narrows by name/owner/description. */
-			const filteredThemePlugins = (0, react.useMemo)(() => {
-				const needle = qThemes.trim().toLowerCase();
-				if (needle === "") return themePlugins$1;
-				return themePlugins$1.filter((p) => {
-					const desc = p.description && (p.description[lang] || p.description.en) || "";
-					return p.name.toLowerCase().includes(needle) || (p.owner || "").toLowerCase().includes(needle) || desc.toLowerCase().includes(needle);
-				});
-			}, [
-				themePlugins$1,
-				qThemes,
-				lang
-			]);
 			/** The catalog entry a deprecated plugin's `replacement` names, if any. */
 			const replacementOf = (p) => p.deprecated === true && p.replacement !== void 0 ? data?.plugins.find((r) => r.name === p.replacement) : void 0;
 			const pluginCard = (p) => {
@@ -4258,14 +4257,24 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 								children: [
 									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 										className: tab === "discover" ? `${Market_module_css_default.tab} ${Market_module_css_default.on}` : Market_module_css_default.tab,
-										onClick: () => setTab("discover"),
+										onClick: () => {
+											setTab("discover");
+											setCat("all");
+										},
 										children: t("tabDiscover")
 									}),
-									themeSnap !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-										className: tab === "themes" ? `${Market_module_css_default.tab} ${Market_module_css_default.on}` : Market_module_css_default.tab,
-										onClick: () => setTab("themes"),
-										children: t("tabThemes")
-									}),
+									TIER_TAB_IDS.map((id) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+										className: tab === id ? `${Market_module_css_default.tab} ${Market_module_css_default.on}` : Market_module_css_default.tab,
+										onClick: () => {
+											setTab(id);
+											setCat("all");
+										},
+										children: [
+											TIER_EMOJI[id],
+											" ",
+											data?.tiers?.[id] && (data.tiers[id][lang] || data.tiers[id].en) || t(TIER_TAB_KEYS[id])
+										]
+									}, id)),
 									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 										className: tab === "installed" ? `${Market_module_css_default.tab} ${Market_module_css_default.on}` : Market_module_css_default.tab,
 										onClick: () => {
@@ -4788,7 +4797,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 									]
 								})
 							]
-						}) : tab === "discover" ? loadError !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						}) : tab === "discover" || tab === "appearance" || tab === "utility" || tab === "agentic" ? loadError !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: Market_module_css_default.empty,
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: t("loadFail") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 								className: Market_module_css_default.err,
@@ -4803,10 +4812,10 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 									animated: true
 								})
 							}), t("loading")]
-						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: Market_module_css_default.stickyHead,
-							children: [
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: Market_module_css_default.stickyHead,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 									className: Market_module_css_default.tabSearchRow,
 									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
 										className: Market_module_css_default.tabSearch,
@@ -4815,32 +4824,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 										value: q,
 										onChange: (e) => setQ(e.target.value)
 									})
-								}),
-								data.tiers !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-									className: Market_module_css_default.tiersRow,
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
-										"data-chip": "1",
-										active: tier === "all",
-										onClick: () => {
-											setTier("all");
-											setCat("all");
-										},
-										children: t("all") + " (" + formatCount(data.count) + ")"
-									}), Object.entries(data.tiers).map(([id, names]) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
-										"data-chip": "1",
-										active: tier === id,
-										onClick: () => {
-											setTier(id);
-											setCat("all");
-										},
-										children: [
-											TIER_EMOJI[id] ?? "",
-											" ",
-											names[lang] || names.en || id
-										]
-									}, id))]
-								}),
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 									className: Market_module_css_default.cats,
 									children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 										className: Market_module_css_default.catsRow,
@@ -4890,120 +4874,91 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 											items: filterItems
 										})]
 									})
-								})
-							]
-						}), plugins.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-							className: Market_module_css_default.empty,
-							children: t("empty")
-						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-							className: Market_module_css_default.grid,
-							children: pagePlugins.map(pluginCard)
-						}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: Market_module_css_default.pager,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.pagerPages,
-								children: totalPages > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "outline",
-										size: "sm",
-										disabled: currentPage === 1,
-										onClick: () => goToPage(1),
-										"aria-label": t("firstPage"),
-										children: "«"
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "outline",
-										size: "sm",
-										icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronLeftOutline14, { size: 14 }),
-										disabled: currentPage === 1,
-										onClick: () => goToPage(currentPage - 1),
-										children: t("prevPage")
-									}),
-									pageItems(currentPage, totalPages).map((item, i) => item === "…" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: Market_module_css_default.pageEllipsis,
-										children: "…"
-									}, "e" + i) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: item === currentPage ? "primary" : "outline",
-										size: "sm",
-										onClick: () => goToPage(item),
-										children: item
-									}, item)),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "outline",
-										size: "sm",
-										disabled: currentPage === totalPages,
-										onClick: () => goToPage(currentPage + 1),
-										children: [t("nextPage"), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronRightOutline14, { size: 14 })]
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "outline",
-										size: "sm",
-										disabled: currentPage === totalPages,
-										onClick: () => goToPage(totalPages),
-										"aria-label": t("lastPage"),
-										children: "»"
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: Market_module_css_default.pageInfo,
-										children: t("pageInfo").replace("{0}", String(currentPage)).replace("{1}", String(totalPages))
-									})
-								] })
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
-								open: sizeOpen,
-								onClose: () => setSizeOpen(false),
-								onSelect: (id) => changePageSize(Number(id)),
-								selectedId: String(pageSize),
-								align: "end",
-								portal: true,
-								anchor: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-									variant: "outline",
-									size: "sm",
-									icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }),
-									onClick: () => setSizeOpen((o) => !o),
-									children: t("perPage") + " " + pageSize
-								}),
-								items: PAGE_SIZES.map((size) => ({
-									id: String(size),
-									label: String(size)
-								}))
-							})]
-						})] })] }) : tab === "themes" && themeSnap !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.tabSearchRow,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-									className: Market_module_css_default.tabSearch,
-									icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, { size: 14 }),
-									placeholder: t("searchPh"),
-									value: qThemes,
-									onChange: (e) => setQThemes(e.target.value)
-								})
+								})]
 							}),
-							(() => {
+							tab === "appearance" && themeSnap !== null && (() => {
 								const extra = themeSnap.themes.filter((def) => def.id !== "light" && def.id !== "dark");
 								return extra.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 									className: `${Market_module_css_default.grid} ${Market_module_css_default.themesGrid}`,
 									children: extra.map((def) => themeCard(def.id, def.id, themeSwatch(def)))
 								});
 							})(),
-							data === null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.loading,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-									className: Market_module_css_default.logoMark,
-									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MarketLogo, {
-										size: 26,
-										animated: true
-									})
-								}), t("loading")]
-							}) : themePlugins$1.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.empty,
-								children: t("themeEmpty")
-							}) : filteredThemePlugins.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							plugins.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 								className: Market_module_css_default.empty,
 								children: t("empty")
-							}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 								className: Market_module_css_default.grid,
-								children: filteredThemePlugins.map(themePluginCard)
-							})
+								children: pagePlugins.map((p) => tab === "appearance" && p.category === "theme" ? themePluginCard(p) : pluginCard(p))
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: Market_module_css_default.pager,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.pagerPages,
+									children: totalPages > 1 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: "outline",
+											size: "sm",
+											disabled: currentPage === 1,
+											onClick: () => goToPage(1),
+											"aria-label": t("firstPage"),
+											children: "«"
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: "outline",
+											size: "sm",
+											icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronLeftOutline14, { size: 14 }),
+											disabled: currentPage === 1,
+											onClick: () => goToPage(currentPage - 1),
+											children: t("prevPage")
+										}),
+										pageItems(currentPage, totalPages).map((item, i) => item === "…" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: Market_module_css_default.pageEllipsis,
+											children: "…"
+										}, "e" + i) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: item === currentPage ? "primary" : "outline",
+											size: "sm",
+											onClick: () => goToPage(item),
+											children: item
+										}, item)),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: "outline",
+											size: "sm",
+											disabled: currentPage === totalPages,
+											onClick: () => goToPage(currentPage + 1),
+											children: [t("nextPage"), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronRightOutline14, { size: 14 })]
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: "outline",
+											size: "sm",
+											disabled: currentPage === totalPages,
+											onClick: () => goToPage(totalPages),
+											"aria-label": t("lastPage"),
+											children: "»"
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: Market_module_css_default.pageInfo,
+											children: t("pageInfo").replace("{0}", String(currentPage)).replace("{1}", String(totalPages))
+										})
+									] })
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
+									open: sizeOpen,
+									onClose: () => setSizeOpen(false),
+									onSelect: (id) => changePageSize(Number(id)),
+									selectedId: String(pageSize),
+									align: "end",
+									portal: true,
+									anchor: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+										variant: "outline",
+										size: "sm",
+										icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }),
+										onClick: () => setSizeOpen((o) => !o),
+										children: t("perPage") + " " + pageSize
+									}),
+									items: PAGE_SIZES.map((size) => ({
+										id: String(size),
+										label: String(size)
+									}))
+								})]
+							})] })
 						] }) : tab === "diagnostics" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Diagnostics, { t }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
 							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 								className: Market_module_css_default.viewBar,

@@ -36,7 +36,7 @@ import css from './Market.module.css'
 import { Diagnostics } from './Diagnostics.tsx'
 import {
   avatarColor, entryForDep, groupSwitchState, humanOutput, isInstalled, looksTerminal, matchInstalledName, orderedCategories,
-  formatCount, pageItems, pluginName, pluginScreenshots, readRegistryCache, readSession, themePlugins as themePluginsOf, themeSwatch, TIME_RANGE_DAYS, visiblePlugins, writeRegistryCache,
+  formatCount, pageItems, pluginName, pluginScreenshots, readRegistryCache, readSession, themeSwatch, TIME_RANGE_DAYS, visiblePlugins, writeRegistryCache,
 } from './market-data.ts'
 import type {
 ActivationInfo, ActivationState, GistExportResult, InstalledMap, InstalledRepoHints, InstalledRepoIdentities, MarketStatus, Registry, RegistryPlugin,
@@ -63,6 +63,14 @@ const TIER_EMOJI: Record<string, string> = {
   appearance: '🎨',
   utility: '🔧',
   agentic: '🤖',
+}
+
+/** 顶层三档标签卡的顺序与本地化键 */
+const TIER_TAB_IDS = ['appearance', 'utility', 'agentic'] as const
+const TIER_TAB_KEYS: Record<string, string> = {
+  appearance: 'tabAppearance',
+  utility: 'tabUtility',
+  agentic: 'tabAgentic',
 }
 
 function HostDependencyDiagnostics({
@@ -350,14 +358,14 @@ export function MarketSection(props: MarketSectionProps) {
   const [tab, setTab] = useState(() => {
     const saved = sessionStorage.getItem('dshm-tab')
     if (saved !== null) sessionStorage.removeItem('dshm-tab')
-    return saved || 'discover'
+    // 旧版「主题」标签已并入「外观与体验」档
+    const value = saved || 'discover'
+    return value === 'themes' ? 'appearance' : value
   })
   const [q, setQ] = useState('')
-  /** Per-tab searches stay independent: discover / themes / installed. */
-  const [qThemes, setQThemes] = useState('')
+  /** Per-tab searches stay independent: catalog tabs / installed. */
   const [qInstalled, setQInstalled] = useState('')
   const [cat, setCat] = useState('all')
-  const [tier, setTier] = useState('all')
   const [confirming, setConfirming] = useState<RegistryPlugin | null>(null)
   const [busyUrl, setBusyUrl] = useState<string | null>(null)
   /** Consecutive idle polls with a pending install that never landed (#32). */
@@ -778,15 +786,21 @@ export function MarketSection(props: MarketSectionProps) {
     return () => clearInterval(timer)
   }, [busyUrl, updatingName, data, installed, repoIdentities, repoHints, refreshInstalled])
 
+  // 三档分类从 Discover 内的 pills 升为顶层标签卡：发现=全部，
+  // 外观与体验 / 工具与能力 / 智能体与技能 各自锁定一档。
+  const activeTier = tab === 'discover' ? 'all'
+    : tab === 'appearance' || tab === 'utility' || tab === 'agentic' ? tab
+    : null
+
   const plugins = useMemo(
-    () => (data === null ? [] : visiblePlugins(data.plugins, {
-      category: cat, query: q, lang, tier,
+    () => (data === null || activeTier === null ? [] : visiblePlugins(data.plugins, {
+      category: cat, query: q, lang, tier: activeTier,
       sort: `${sortField}-${sortDir}`,
       sinceDays: timeRange === 'all' ? undefined : TIME_RANGE_DAYS[timeRange],
     })),
-    [data, q, tier, cat, lang, sortField, sortDir, timeRange])
+    [data, q, activeTier, cat, lang, sortField, sortDir, timeRange])
 
-  useEffect(() => { setPage(1) }, [q, tier, cat, sortField, sortDir, timeRange])
+  useEffect(() => { setPage(1) }, [q, activeTier, cat, sortField, sortDir, timeRange])
 
   const totalPages = Math.max(1, Math.ceil(plugins.length / pageSize))
   // Clamp in case the list shrank while the user was on a later page.
@@ -884,7 +898,7 @@ export function MarketSection(props: MarketSectionProps) {
           // Themes auto-activate on install; reload straight into the Themes
           // tab so the new look is on screen immediately.
           sessionStorage.setItem('dshm-toast', JSON.stringify([plugin.name]))
-          sessionStorage.setItem('dshm-tab', 'themes')
+          sessionStorage.setItem('dshm-tab', 'appearance')
           location.reload()
           return
         }
@@ -1075,7 +1089,7 @@ export function MarketSection(props: MarketSectionProps) {
         if (status === 200 && body.ok) {
           sessionStorage.setItem('dshm-toast', JSON.stringify([name]))
           sessionStorage.setItem('dshm-toast-mode', 'theme')
-          sessionStorage.setItem('dshm-tab', 'themes')
+          sessionStorage.setItem('dshm-tab', 'appearance')
           location.reload()
         } else {
           setInstallError(String(body.error || 'failed'))
@@ -1144,7 +1158,7 @@ export function MarketSection(props: MarketSectionProps) {
             // Drop a stale install/switch toast so it cannot resurrect.
             sessionStorage.removeItem('dshm-toast')
             sessionStorage.removeItem('dshm-toast-mode')
-            sessionStorage.setItem('dshm-tab', 'themes')
+            sessionStorage.setItem('dshm-tab', 'appearance')
             location.reload()
           }
         } else {
@@ -1535,19 +1549,6 @@ export function MarketSection(props: MarketSectionProps) {
     else if (id.startsWith('time:')) setTimeRange(id.slice(5) as TimeRange)
   }
 
-  const themePlugins = data === null ? [] : themePluginsOf(data.plugins)
-  /** Themes-tab search narrows by name/owner/description. */
-  const filteredThemePlugins = useMemo(() => {
-    const needle = qThemes.trim().toLowerCase()
-    if (needle === '') return themePlugins
-    return themePlugins.filter(p => {
-      const desc = (p.description && (p.description[lang] || p.description.en)) || ''
-      return p.name.toLowerCase().includes(needle)
-        || (p.owner || '').toLowerCase().includes(needle)
-        || desc.toLowerCase().includes(needle)
-    })
-  }, [themePlugins, qThemes, lang])
-
   /** The catalog entry a deprecated plugin's `replacement` names, if any. */
   const replacementOf = (p: RegistryPlugin): RegistryPlugin | undefined =>
     p.deprecated === true && p.replacement !== undefined
@@ -1826,8 +1827,14 @@ export function MarketSection(props: MarketSectionProps) {
           >{exportState === 'busy' ? t('exportingLog') : t('exportLog')}</Button>
         </div>
         <div className={css.tabs}>
-          <button className={tab === 'discover' ? `${css.tab} ${css.on}` : css.tab} onClick={() => setTab('discover')}>{t('tabDiscover')}</button>
-          {themeSnap !== null && <button className={tab === 'themes' ? `${css.tab} ${css.on}` : css.tab} onClick={() => setTab('themes')}>{t('tabThemes')}</button>}
+          <button className={tab === 'discover' ? `${css.tab} ${css.on}` : css.tab} onClick={() => { setTab('discover'); setCat('all') }}>{t('tabDiscover')}</button>
+          {/* 三档分类（外观与体验 / 工具与能力 / 智能体与技能）与「发现」并列，
+              取代旧「主题」标签；标签文案随目录数据本地化 */}
+          {TIER_TAB_IDS.map((id) => (
+            <button key={id} className={tab === id ? `${css.tab} ${css.on}` : css.tab} onClick={() => { setTab(id); setCat('all') }}>
+              {TIER_EMOJI[id]} {(data?.tiers?.[id] && (data.tiers[id]![lang] || data.tiers[id]!.en)) || t(TIER_TAB_KEYS[id])}
+            </button>
+          ))}
           <button className={tab === 'installed' ? `${css.tab} ${css.on}` : css.tab} onClick={() => { setTab('installed'); refreshInstalled(true) }}>
             {t('tabInstalled') + (Object.keys(installed).length > 0 ? ' (' + Object.keys(installed).length + ')' : '')}
             {hasUpdates && <StateDot state="error" size={7} className={css.dot} />}
@@ -2126,7 +2133,7 @@ export function MarketSection(props: MarketSectionProps) {
                 </section>
               </div>
             )
-          : tab === 'discover'
+          : (tab === 'discover' || tab === 'appearance' || tab === 'utility' || tab === 'agentic')
           ? loadError !== null
             ? <div className={css.empty}>
                 <div>{t('loadFail')}</div>
@@ -2140,19 +2147,6 @@ export function MarketSection(props: MarketSectionProps) {
                     <div className={css.tabSearchRow}>
                       <Input className={css.tabSearch} icon={<IconSearchOutline16 size={14} />} placeholder={t('searchPh')} value={q} onChange={e => setQ(e.target.value)} />
                     </div>
-                    {data.tiers !== undefined && (
-                      <div className={css.tiersRow}>
-                        <Pill data-chip="1" active={tier === 'all'} onClick={() => { setTier('all'); setCat('all'); }}>{t('all') + ' (' + formatCount(data.count) + ')'}</Pill>
-                        {Object.entries(data.tiers).map(([id, names]) => (
-                          <Pill
-                            key={id}
-                            data-chip="1"
-                            active={tier === id}
-                            onClick={() => { setTier(id); setCat('all'); }}
-                          >{TIER_EMOJI[id] ?? ''} {(names[lang] || names.en) || id}</Pill>
-                        ))}
-                      </div>
-                    )}
                     <div className={css.cats}>
                       <div className={css.catsRow}>
                       {/* The height cap belongs to the MEASURING pass only: that pass
@@ -2211,11 +2205,22 @@ export function MarketSection(props: MarketSectionProps) {
                       </div>
                     </div>
                     </div>
+                    {tab === 'appearance' && themeSnap !== null && (() => {
+                      // Light/dark/system live in the official Appearance setting;
+                      // this section only shows registered third-party palettes.
+                      const extra = themeSnap.themes.filter(def => def.id !== 'light' && def.id !== 'dark')
+                      return extra.length > 0 && (
+                        <div className={`${css.grid} ${css.themesGrid}`}>
+                          {extra.map(def => themeCard(def.id, def.id, themeSwatch(def)))}
+                        </div>
+                      )
+                    })()}
                     {plugins.length === 0
                       ? <div className={css.empty}>{t('empty')}</div>
                       : (
                           <>
-                            <div className={css.grid}>{pagePlugins.map(pluginCard)}</div>
+                            {/* 外观与体验档里的主题类插件保留主题卡片（使用/正在使用/卸载） */}
+                            <div className={css.grid}>{pagePlugins.map(p => tab === 'appearance' && p.category === 'theme' ? themePluginCard(p) : pluginCard(p))}</div>
                             <div className={css.pager}>
                               <div className={css.pagerPages}>
                                 {totalPages > 1 && (
@@ -2273,33 +2278,7 @@ export function MarketSection(props: MarketSectionProps) {
                         )}
                   </>
                 )
-          : tab === 'themes' && themeSnap !== null
-            ? (
-                <>
-                  <div className={css.tabSearchRow}>
-                    <Input className={css.tabSearch} icon={<IconSearchOutline16 size={14} />} placeholder={t('searchPh')} value={qThemes} onChange={e => setQThemes(e.target.value)} />
-                  </div>
-                  {/* Light/dark/system live in the official Appearance setting; this
-                    tab only shows what that setting can't: registered third-party
-                    palettes (none in the wild yet) and installable theme plugins. */}
-                  {(() => {
-                    const extra = themeSnap.themes.filter(def => def.id !== 'light' && def.id !== 'dark')
-                    return extra.length > 0 && (
-                      <div className={`${css.grid} ${css.themesGrid}`}>
-                        {extra.map(def => themeCard(def.id, def.id, themeSwatch(def)))}
-                      </div>
-                    )
-                  })()}
-                  {data === null
-                    ? <div className={css.loading}><span className={css.logoMark}><MarketLogo size={26} animated /></span>{t('loading')}</div>
-                    : themePlugins.length === 0
-                      ? <div className={css.empty}>{t('themeEmpty')}</div>
-                      : filteredThemePlugins.length === 0
-                        ? <div className={css.empty}>{t('empty')}</div>
-                        : <div className={css.grid}>{filteredThemePlugins.map(themePluginCard)}</div>}
-                </>
-              )
-            : tab === 'diagnostics'
+          : tab === 'diagnostics'
             ? <Diagnostics t={t} />
             : (
                 <>

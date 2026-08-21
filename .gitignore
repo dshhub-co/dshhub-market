@@ -1,0 +1,8 @@
+node_modules/
+lib/
+site/
+coverage/
+*.tgz
+.DS_Store
+.idea/
+data/readmes-snapshot.json

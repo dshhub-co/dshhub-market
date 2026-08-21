@@ -8,9 +8,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dshhub/dshhub.git"
+    "url": "git+https://github.com/dshhub/dshhub-market.git"
   },
   "homepage": "https://www.dshhub.co",
+  "bugs": {
+    "url": "https://github.com/dshhub/dshhub-market/issues"
+  },
   "keywords": [
     "deepseek",
     "harness",

@@ -37,3 +37,9 @@
 5. `npm run typecheck && npx vitest run && node scripts/preflight.mjs` 全绿。
 6. `npm run pack:market`（根目录）重打包 `public/dshhub-market.tgz`，提交 `market/client/client.js`。
 7. 更新本文件基线与日期。
+
+## 拆仓记录
+
+- **2026-08-21**：`market/` 从 dshhub 主仓拆出为独立仓库 [dshhub/dshhub-market](https://github.com/dshhub/dshhub-market)。
+  主仓的 `pack:market` 改为从 npm 拉取本包重新打包 `public/dshhub-market.tgz`；版本端点
+  `/api/market/version` 改读主仓内置的 `lib/market-version.json`（由打包脚本同步）。

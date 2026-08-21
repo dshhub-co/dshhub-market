@@ -2189,6 +2189,29 @@ export function MarketSection(props: MarketSectionProps) {
             {staleName !== null && (
               <Button size="sm" onClick={() => doUpdate(staleName, true)}>{t('updateNow')}</Button>
             )}
+            {/* 放行并重试直接放在报错旁（不再只挂在上方横幅） */}
+            {buildsSkipped !== null && (
+              <Button
+                size="sm"
+                disabled={busyUrl !== null}
+                onClick={() => {
+                  const { plugin, updateName, names } = buildsSkipped
+                  setBuildsSkipped(null)
+                  fetch('/dsh-market/approve-builds', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ packages: names }),
+                  })
+                    .then(res => res.json())
+                    .then((body) => {
+                      if (!body.ok) setInstallError(String(body.error || 'approve failed'))
+                      else if (plugin !== undefined) doInstall(plugin)
+                      else if (updateName !== undefined) doUpdate(updateName)
+                    })
+                    .catch(error => setInstallError(String(error)))
+                }}
+              >{t('approveBuilds')}</Button>
+            )}
             {/* The banner text told users to export the log; now it IS the button (#84). */}
             <Button
               size="sm"
@@ -2298,11 +2321,21 @@ export function MarketSection(props: MarketSectionProps) {
                         {bundle.items.map((item, i) => {
                           const installUrl = item.zip ?? item.url ?? ''
                           const installedMatch = typeof item.name === 'string' && installed[item.name] !== undefined
+                          // 每个插件的默认描述/摘要（registry 双语字段，跟随界面语言）
+                          const rp = typeof item.url === 'string' ? (data?.plugins ?? []).find(p => p.url === item.url) : undefined
+                          const itemDesc = rp?.description
+                            ? ((rp.description[lang] ?? rp.description.en) || '')
+                            : ''
                           return (
                             <div key={i} className={css.unlockedItem}>
-                              <span className={css.unlockedItemName}>
-                                {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
-                              </span>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <span className={css.unlockedItemName}>
+                                  {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
+                                </span>
+                                {itemDesc !== '' && (
+                                  <span className={css.unlockedItemDesc}>{itemDesc}</span>
+                                )}
+                              </div>
                               {installedMatch ? (
                                 <span className={css.unlockedInstalled}>{t('installedLabel')}</span>
                               ) : (

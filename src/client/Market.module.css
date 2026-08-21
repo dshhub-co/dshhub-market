@@ -327,6 +327,7 @@
 .unlockedLabel{font-weight:600;color:var(--dsw-alias-label-secondary,#6b7280);margin-right:6px}
 .unlockedItem{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);padding-top:8px}
 .unlockedItemName{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlockedItemDesc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280);margin-left:24px;display:block}
 .unlockedInstalled{font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,#16a34a)}
 
 /* ---- 解锁卡片 v2（买家体验：去商业味、有人味） ---- */

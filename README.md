@@ -49,10 +49,10 @@ From npm:
 dsh plugin --profile web add dshhub-market
 ```
 
-Or straight from DSHHub.co:
+Or a pinned version from DSHHub.co (versioned links never change, so lockfile checksums stay stable):
 
 ```sh
-dsh plugin --profile web add https://www.dshhub.co/dshhub-market.tgz
+dsh plugin --profile web add https://www.dshhub.co/dshhub-market-0.8.2.tgz
 ```
 
 Or from GitHub:

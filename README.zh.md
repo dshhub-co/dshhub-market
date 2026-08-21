@@ -60,10 +60,10 @@ DSH 了：重装、更新都不再扣码。
 dsh plugin --profile web add dshhub-market
 ```
 
-或直接从 DSHHub.co：
+或从 DSHHub.co 指定版本（版本化链接内容永不改变，锁文件指纹稳定）：
 
 ```sh
-dsh plugin --profile web add https://www.dshhub.co/dshhub-market.tgz
+dsh plugin --profile web add https://www.dshhub.co/dshhub-market-0.8.2.tgz
 ```
 
 或从 GitHub：

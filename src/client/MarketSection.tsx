@@ -86,6 +86,7 @@ interface UnlockedBundleItem {
 
 interface UnlockedBundle {
   id: string
+  bundleId: string
   name: string
   description: string
   teachingLinks: string
@@ -101,6 +102,22 @@ interface UnlockedBundle {
   bundleUpdatedAt: string
   items: UnlockedBundleItem[]
   redeemedAt: string
+}
+
+/**
+ * 同一口令包判定：bundleId 相同时同包；无 bundleId（历史记录）按名称 + 条目
+ * 地址判定。任何页面同一包只允许出现一张卡片。
+ */
+function sameUnlockedKey(a: UnlockedBundle, b: UnlockedBundle): boolean {
+  if (a.bundleId !== '' && b.bundleId !== '') return a.bundleId === b.bundleId
+  if (a.name === '' || a.name !== b.name) return false
+  const keys = (r: UnlockedBundle) =>
+    r.items
+      .map((i) => i.url ?? i.pluginId ?? '')
+      .filter((v) => v !== '')
+      .sort()
+      .join('|')
+  return keys(a) !== '' && keys(a) === keys(b)
 }
 
 // ---- 解锁卡片 v2 的纯函数：视频解析 / FAQ / 联系方式 ----
@@ -769,7 +786,11 @@ export function MarketSection(props: MarketSectionProps) {
       .then(res => res.json())
       .then((body) => {
         if (Array.isArray((body as { bundles?: unknown }).bundles)) {
-          setUnlocked((body as { bundles: UnlockedBundle[] }).bundles)
+          // 读取时归一化：同一包只保留一张卡片（顺带清理旧版本留下的存量重复）
+          setUnlocked((body as { bundles: UnlockedBundle[] }).bundles.reduce<UnlockedBundle[]>((acc, b) => {
+            if (acc.some((x) => sameUnlockedKey(x, b))) return acc
+            return [...acc, b]
+          }, []))
         }
       })
       .catch(() => {})
@@ -1009,7 +1030,14 @@ export function MarketSection(props: MarketSectionProps) {
       .then(res => res.json().then(body => ({ status: res.status, body })))
       .then(({ status, body }) => {
         if (status === 200 && body.ok && body.bundle) {
-          setUnlocked(prev => [body.bundle, ...prev])
+          // 去重：同一口令包只出现一张卡片（重复输码移到顶部，不新增）
+          setUnlocked(prev => {
+            const nb = body.bundle as UnlockedBundle
+            const dup = prev.findIndex(b => sameUnlockedKey(b, nb))
+            if (dup === -1) return [nb, ...prev]
+            const next = prev.filter((_, i) => i !== dup)
+            return [nb, ...next]
+          })
           setRedeemCode('')
           setRedeemNotice(body.bundle.name)
         } else {

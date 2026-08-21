@@ -813,7 +813,19 @@ export function mountMarketRoutes(
       path: '/dsh-market/unlocked',
       handler: async (_request, response) => {
         try {
-          sendJson(response, 200, { bundles: readUnlockedState(activeProfileDir).bundles })
+          // 归一化：同一包只保留一张卡片；旧版本可能存过重复记录，读到即清理
+          const state = readUnlockedState(activeProfileDir)
+          const seen = new Set<string>()
+          const deduped = state.bundles.filter((b) => {
+            const key = b.bundleId !== '' ? `b:${b.bundleId}` : `n:${b.name}|${b.items.map((i) => i.url ?? i.pluginId ?? '').sort().join('|')}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+          if (deduped.length !== state.bundles.length) {
+            writeUnlockedState(activeProfileDir, { ...state, bundles: deduped })
+          }
+          sendJson(response, 200, { bundles: deduped })
         } catch (error) {
           sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
         }

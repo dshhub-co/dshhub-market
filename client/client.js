@@ -2422,6 +2422,16 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			utility: "🔧",
 			agentic: "🤖"
 		};
+		/**
+		* 同一口令包判定：bundleId 相同时同包；无 bundleId（历史记录）按名称 + 条目
+		* 地址判定。任何页面同一包只允许出现一张卡片。
+		*/
+		function sameUnlockedKey(a, b) {
+			if (a.bundleId !== "" && b.bundleId !== "") return a.bundleId === b.bundleId;
+			if (a.name === "" || a.name !== b.name) return false;
+			const keys = (r) => r.items.map((i) => i.url ?? i.pluginId ?? "").filter((v) => v !== "").sort().join("|");
+			return keys(a) !== "" && keys(a) === keys(b);
+		}
 		/** B站/YouTube 解析为内嵌地址；抖音/快手/视频号等解析不了 → 跳转打开。 */
 		function parseVideo(url) {
 			const u = (url ?? "").trim();
@@ -3141,7 +3151,10 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				}).catch(() => {});
 				refreshInstalled();
 				fetch("/dsh-market/unlocked").then((res) => res.json()).then((body) => {
-					if (Array.isArray(body.bundles)) setUnlocked(body.bundles);
+					if (Array.isArray(body.bundles)) setUnlocked(body.bundles.reduce((acc, b) => {
+						if (acc.some((x) => sameUnlockedKey(x, b))) return acc;
+						return [...acc, b];
+					}, []));
 				}).catch(() => {});
 			}, [refreshInstalled]);
 			(0, react.useEffect)(() => {
@@ -3364,7 +3377,12 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 					body
 				}))).then(({ status, body }) => {
 					if (status === 200 && body.ok && body.bundle) {
-						setUnlocked((prev) => [body.bundle, ...prev]);
+						setUnlocked((prev) => {
+							const nb = body.bundle;
+							const dup = prev.findIndex((b) => sameUnlockedKey(b, nb));
+							if (dup === -1) return [nb, ...prev];
+							return [nb, ...prev.filter((_, i) => i !== dup)];
+						});
 						setRedeemCode("");
 						setRedeemNotice(body.bundle.name);
 					} else setRedeemError(typeof body.error === "string" ? body.error : `HTTP ${String(status)}`);

@@ -7,8 +7,8 @@
 English | [中文](README.zh.md)
 
 [![npm](https://img.shields.io/npm/v/dshhub-market)](https://www.npmjs.com/package/dshhub-market)
-[![stars](https://img.shields.io/github/stars/dshhub/dshhub-market?style=flat)](https://github.com/dshhub/dshhub-market)
-[![CI](https://github.com/dshhub/dshhub-market/actions/workflows/ci.yml/badge.svg)](https://github.com/dshhub/dshhub-market/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/dshhub-co/dshhub-market?style=flat)](https://github.com/dshhub-co/dshhub-market)
+[![CI](https://github.com/dshhub-co/dshhub-market/actions/workflows/ci.yml/badge.svg)](https://github.com/dshhub-co/dshhub-market/actions/workflows/ci.yml)
 
 The plugin market inside DeepSeek Harness, powered by [DSHHub.co](https://www.dshhub.co) — browse, search, one-click install community plugins from Settings → **Plugin Market**.
 
@@ -90,7 +90,7 @@ This is a fork of [dsh-market/dsh-market](https://github.com/dsh-market/dsh-mark
 
 ## Roadmap & feedback
 
-- **Bugs** go in [issues](https://github.com/dshhub/dshhub-market/issues) — attaching the market's "Export log" makes diagnosis roughly ten times faster
+- **Bugs** go in [issues](https://github.com/dshhub-co/dshhub-market/issues) — attaching the market's "Export log" makes diagnosis roughly ten times faster
 - Feature ideas welcome as issues too — say so before starting a big PR, so two people don't build it twice
 
 ## Data source

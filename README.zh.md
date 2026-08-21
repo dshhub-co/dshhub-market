@@ -7,8 +7,8 @@
 [English](README.md) | 中文
 
 [![npm](https://img.shields.io/npm/v/dshhub-market)](https://www.npmjs.com/package/dshhub-market)
-[![stars](https://img.shields.io/github/stars/dshhub/dshhub-market?style=flat)](https://github.com/dshhub/dshhub-market)
-[![CI](https://github.com/dshhub/dshhub-market/actions/workflows/ci.yml/badge.svg)](https://github.com/dshhub/dshhub-market/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/dshhub-co/dshhub-market?style=flat)](https://github.com/dshhub-co/dshhub-market)
+[![CI](https://github.com/dshhub-co/dshhub-market/actions/workflows/ci.yml/badge.svg)](https://github.com/dshhub-co/dshhub-market/actions/workflows/ci.yml)
 
 装在 DeepSeek Harness 里的插件市场，由 [DSHHub.co](https://www.dshhub.co) 驱动——打开设置 → **插件市场**，逛一逛，点一下，装好。
 
@@ -88,7 +88,7 @@ dsh plugin --profile web add https://www.dshhub.co/dshhub-market.tgz
 
 ## 路线图与反馈
 
-- **Bug** 提 [issue](https://github.com/dshhub/dshhub-market/issues)，附上市场页面的「导出日志」能让排查快十倍
+- **Bug** 提 [issue](https://github.com/dshhub-co/dshhub-market/issues)，附上市场页面的「导出日志」能让排查快十倍
 - 功能建议也欢迎提 issue；动手做大 PR 前先说一声，免得两个人重复造
 
 ## 数据源

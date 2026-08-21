@@ -10,19 +10,38 @@ English | [中文](README.zh.md)
 [![stars](https://img.shields.io/github/stars/dshhub-co/dshhub-market?style=flat)](https://github.com/dshhub-co/dshhub-market)
 [![CI](https://github.com/dshhub-co/dshhub-market/actions/workflows/ci.yml/badge.svg)](https://github.com/dshhub-co/dshhub-market/actions/workflows/ci.yml)
 
-The plugin market inside DeepSeek Harness, powered by [DSHHub.co](https://www.dshhub.co) — browse, search, one-click install community plugins from Settings → **Plugin Market**.
+> The good stuff has a code. Enter it, get it.
 
-> A maintained fork of [dsh-market/dsh-market](https://github.com/dsh-market/dsh-market) (MIT): same market engine, rebranded and wired to the DSHHub.co catalog and update channel. See [UPSTREAM.md](UPSTREAM.md) for the fork record.
+dshhub-market is the unlock-with-a-code plugin market inside DSH (DeepSeek Harness). Buyers enter a code and the plugin installs itself; creators hand out codes in their own channels and get their best work into the right hands; free plugins find their people too. Run by [DSHHub.co](https://www.dshhub.co).
 
-> **Not recommended, not supported: `anywhere-labs/deepseek-harness-desktop` — nor will we deliberately support protocols it unilaterally requires, or ask plugins listed in this market to adapt to them.** Use [dsh-desktop](https://github.com/dataelement/dsh-desktop) or [deepseek-harness-desktop](https://github.com/hairyf/deepseek-harness-desktop), or another excellent third-party client.
+## What you see
 
-![dsh-market](assets/demo-en.png)
+Picture it: you open the plugin market inside DSH, and the homepage holds exactly one thing — a small box for a six-digit code.
 
-One-click themes — install, switch live, no restart:
+No catalog. No recommendations. No sign-up. As a buyer you never log in anywhere; the only door is the code itself, something like 3K7M9P.
 
-![Themes tab](assets/themes-en.png)
+Try the demo code **080808**: a skin plugin unlocks and installs itself on the spot, and you see the effect immediately. Consider it a handshake.
+
+Press Enter and everything just happens: the plugin — or a whole pack of them — unlocks, installs, and is ready to use. Updates are free from then on. It feels like typing a verification code, because it's built to. Unlocking only installs — no payment is involved.
+
+Once unlocked, each card talks about two things only: who made it, and what it's for. Who's behind it, a note from them, what it does, an install button, a short guide, how to reach the author — everything orbits a person and their work. No ads, no noise.
+
+Everything you've unlocked sits in "My unlocked plugins," ready to install, switch, or remove any time. Unlocked plugins remember your DSH: reinstall and update without burning the code again.
+
+## What you get as a creator
+
+Creators work from [dshhub.co](https://www.dshhub.co), signed in with their GitHub account. Two ways to stock your shelf:
+
+- Pick a plugin from the official curated catalog
+- Import your own GitHub repository — public or private
+
+Then generate a code and hand it out anywhere your people are: a video, a livestream, an article. Anyone who enters it gets the plugin installed on the spot. The platform shows you redemption stats and per-batch breakdowns, so you always know which code reached how many people. A code dies at redemption; until then it can be passed along — perfect for your distribution partners.
+
+What you're really offering isn't source code — it's teaching, answering questions, being there for people. The plugins are free; what the code pays for is the person behind them. The platform takes zero cut for now, and any future pricing will be announced well ahead of time.
 
 ## Install
+
+Requires dsh web 0.1.0-rc.6 or newer.
 
 From npm:
 
@@ -30,90 +49,58 @@ From npm:
 dsh plugin --profile web add dshhub-market
 ```
 
-Or directly from DSHHub.co:
+Or straight from DSHHub.co:
 
 ```sh
 dsh plugin --profile web add https://www.dshhub.co/dshhub-market.tgz
 ```
 
+Or from GitHub:
+
+```sh
+dsh plugin --profile web add github:dshhub-co/dshhub-market
+```
+
 Restart `dsh web`, then open **Settings → Plugin Market**.
 
-**Requires dsh web 0.1.0-rc.6 or newer.** On an older host the market
-disables itself and says so in the browser console rather than rendering
-against primitives that are not there — if the Plugin Market entry never
-appears, that is usually why. Worth checking when a desktop build bundles
-its own dsh: it may be older than the one `npm` would give you.
+On an older host the market disables itself and says so in the browser console — if the Plugin Market entry never appears, that's usually why. A desktop build may bundle a dsh older than the one npm would give you.
 
-## What you get
+## Under the hood
 
-- **Browse & search** the community catalog — category filters, star counts, top/new sorting, bilingual descriptions that follow your UI language
-- **Screenshots** — AppStore-style screenshots in the install dialog: author-curated via the registry, with automatic README extraction as fallback; images load from GitHub hosting only, and only after you open the dialog
-- **Themes** — a dedicated tab for community themes and skins: install → active immediately, switch with one click (themes are mutually exclusive, your choice survives restarts), uninstall to revert
-- **One-click install** — confirm the source, watch live progress; most plugins go live after a page refresh, no restart
-- **Backup & restore** — export your profile's plugin list and configuration as readable JSON, import it on another machine, store it on WebDAV with daily auto-backup, or sync through a private GitHub Gist; restores **merge** (plugins installed after the backup are kept), validate before writing, and roll back on failure
-- **Updates** — per-plugin update checks (npm version or pinned commit vs HEAD), one-click update, or update everything at once; the market updates itself from the DSHHub.co release channel
-- **Uninstall** — two-step confirm; plugins installed this session are removed live
-- **Hot disable / enable** — toggles write `- id: …` + `disabled: true|false` into the profile's `cordis.patch.yml` (the official patch layer, mechanism ported from [dsh-plugin-hub](https://github.com/Noob-stupid/dsh-plugin-hub)): DSH's HMR re-composes within ~1s, no restart, and the loader re-applies the choice on every boot; hand-edited patch rows show as badges, host-infrastructure plugins are protected from toggling, and a malformed patch file is never made worse
-- **Restart when needed** — changes that cannot hot-load show a one-click restart beside the pending-change banner; the action is restricted to same-origin loopback requests
-- **Zero jargon** — if a component is missing (pnpm), the market detects it and offers a one-click automatic setup
-- **Log export** — one click produces a sanitized plain-text log for bug reports (home paths and credential shapes are masked; nothing is ever sent anywhere). The market's version sits next to the page heading, so a screenshot of a problem already carries it
-- **Settings card** — on dsh 0.1.0-rc.7 and newer the market manages *itself* from **Settings → Plugins → Plugin configuration**, next to every other plugin: see the running version, pick a **release channel** (stable, or beta to try builds still being verified — the market only, never your other plugins), update, or remove the market — with an opt-in cleanup that also drops the disable rows it wrote, so plugins it switched off start running again rather than staying off with no UI left to switch them back on
-- **Diagnostics** — the plugin load order and conflict surface, one page: bundle stack with official/community badges, duplicate loader entries, dependency version mismatches, multi-version core packages, overrides and invalid config entries. Plain-language terms, problem blocks highlighted, everything collapsible
-- **Load order** — drag community bundles into the order you want, or take the suggested one derived from the plugins' own before/after rules. Nothing is written until a trial composition passes, and the panel tells you what the new order would change (overrides, invalid or duplicate entries) before you apply it
-- **AI fix** — one click copies a diagnostics-driven fix prompt (errors/warnings/order conflicts + conservative scope instructions) to the clipboard; you paste it into a new conversation and decide whether to send
-- **DSHHub.co integration** — paid plugins download with your DSHHub account token, and a local bridge lets the DSHHub.co website trigger one-click installs straight into this DSH profile
+As a market app it also carries these real capabilities:
 
-## Speed
-
-Installs prefer npm tarballs over full-repo GitHub downloads whenever a plugin publishes to npm (registry-verified against the repo to prevent name squatting). Registry installs are typically seconds; GitHub-only plugins depend on your connection to GitHub.
+- **One-click install** — confirm the source, watch live progress; most plugins are ready after a refresh
+- **Theme skins** — apply instantly, no restart
+- **Update / uninstall** — two-step confirm against accidents
+- **Hot disable / enable** — takes effect in about a second, survives reboots
+- **Backup & restore** — daily auto-backup to WebDAV, or sync across machines via a private Gist
+- **Diagnostics** — load order and conflicts on one page
+- **Load order management** — drag to reorder, validated before anything is written
+- **AI fix hints** — one click copies a diagnostics-driven repair prompt
+- **Sanitized log export** — bug reports carry the version, private details masked
 
 ## Security
 
-- Installs are restricted to sources listed in the DSHHub.co registry (a curated catalog merged from the [awesome-dsh-plugin](https://awesome-dsh-plugin.com) list plus DSHHub uploads) — anything else is rejected
-- Build scripts stay blocked by default (pnpm ≥10); allowing one is your explicit per-package choice
-- Terminal/CLI-surface plugins are flagged before you install them into the web profile
-- The install endpoint accepts same-origin POST only; the market never phones home
-- The local bridge used by the DSHHub.co website accepts requests from loopback and dshhub.co origins only
-- Backups can contain credentials from your profile config — the UI warns before export and upload; WebDAV sync is https-only, refuses private-network targets, and never stores your password in the browser
-- The restart endpoint additionally requires a direct loopback client (forwarded requests are rejected) and relaunches the exact DSH entry, arguments, environment, and working directory
-- One-click restart launches a detached replacement. If DSH is managed by systemd, launchd, pm2, or another supervisor, set the plugin option `allowRestart: false` and let the supervisor own restarts instead; the pending-change notice remains visible but the button is hidden
-- For terminal-attached launches, the detached replacement keeps running after the original terminal closes
-- Listing ≠ endorsement: plugins are third-party code, install sources you trust
-
-## Submit your plugin
-
-**This repo is the market app, not the catalog.** The plugin list is served by [DSHHub.co](https://www.dshhub.co) — register an account and upload your plugin there. (The catalog merges the curated [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) list with DSHHub uploads.) Please don't PR plugin entries against this repo.
+- Installs are restricted to sources in the DSHHub.co registry — anything else is rejected
+- Code from private repositories never enters the public catalog — it passes through the platform only when a fan redeems a code
+- Build scripts stay blocked by default; allowing one is your explicit choice
+- The install endpoint accepts same-origin requests only
+- The local bridge for dshhub.co accepts loopback and dshhub.co origins only
+- Clear warnings before backup export; logs are sanitized throughout
 
 ## Fork
 
-This is a fork of [dsh-market/dsh-market](https://github.com/dsh-market/dsh-market) (MIT license, copyright retained). Differences: rebranded as `dshhub-market`, registry default and self-update channel point at [DSHHub.co](https://www.dshhub.co), added a zip install channel, a local install bridge for the website, and DSHHub account-token downloads for paid plugins. The full change list and resync procedure live in [UPSTREAM.md](UPSTREAM.md).
+This is a fork of [dsh-market/dsh-market](https://github.com/dsh-market/dsh-market) (MIT license, copyright retained) with the same market engine. Differences: rebranded as `dshhub-market`, with the registry and self-update channel pointing at [DSHHub.co](https://www.dshhub.co). The full change list and resync procedure live in [UPSTREAM.md](UPSTREAM.md).
 
-## Roadmap & feedback
+## Feedback
 
-- **Bugs** go in [issues](https://github.com/dshhub-co/dshhub-market/issues) — attaching the market's "Export log" makes diagnosis roughly ten times faster
-- Feature ideas welcome as issues too — say so before starting a big PR, so two people don't build it twice
+Bugs go in [issues](https://github.com/dshhub-co/dshhub-market/issues) — attaching the market's exported log makes diagnosis about ten times faster. Feature ideas are welcome too; say what you're planning before a big PR, so two people don't build the same thing twice.
+
+Note: this repository is the market app itself, not the catalog. The plugin list is served by dshhub.co — list your work there, and please don't open PRs for plugin entries here.
 
 ## Data source
 
-Live from [www.dshhub.co/api/registry/plugins.json](https://www.dshhub.co/api/registry/plugins.json) — the merged DSHHub catalog, refreshed by the platform — with a bundled snapshot as offline fallback.
-
-## Friends
-
-### DSH Desktop (dataelement)
-
-[dsh-desktop](https://github.com/dataelement/dsh-desktop) — a desktop app for DeepSeek Harness: run and manage a local Harness without installing Node.js yourself.
-
-### DeepSeek Harness Desktop (hairyf)
-
-[deepseek-harness-desktop](https://github.com/hairyf/deepseek-harness-desktop) — a native desktop app for DeepSeek Harness built with **Tauri** (Rust + Web).
-
-### DSH Get
-
-[DSH Get](https://www.dshget.com/) — a searchable web directory for discovering DeepSeek Harness plugins.
-
-### dsh-market (upstream)
-
-[dsh-market](https://github.com/dsh-market/dsh-market) — the original market this project is forked from.
+Live from [www.dshhub.co/api/registry/plugins.json](https://www.dshhub.co/api/registry/plugins.json), with a bundled snapshot as offline fallback.
 
 ## License
 

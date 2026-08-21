@@ -33,9 +33,15 @@ export function updateBase(): string {
   return process.env.DSHHUB_UPDATE_BASE ?? 'https://www.dshhub.co'
 }
 
-/** The published tarball for the current channel (v1: one public channel). */
-export function selfUpdateTarget(base = updateBase()): string {
-  return `${base}/dshhub-market.tgz`
+/**
+ * The published tarball for the current channel (v1: one public channel).
+ * 版本化 URL 是必须的：profile 里的依赖 spec 若不变化（同一个 tgz 地址），
+ * pnpm 会判定 "Already up to date" 而不重新下载——「更新命令执行完成，但
+ * 版本没有变化」就是这么来的。带上版本号后每次更新都是新 spec，必然重装。
+ * 无版本的裸地址仍留给安装向导使用（/dshhub-market.tgz）。
+ */
+export function selfUpdateTarget(base = updateBase(), version = ''): string {
+  return version !== '' ? `${base}/dshhub-market-${version}.tgz` : `${base}/dshhub-market.tgz`
 }
 
 /** This package's own version, read from its installed package.json. */
@@ -77,7 +83,7 @@ export function scheduleSelfUpdate(profile: string): void {
       const installed = readOwnVersion()
       if (remote === null || installed === '0.0.0') return
       if (!ownIsUpgrade(installed, remote)) return
-      const result = await runDshPlugin(profile, ['add', selfUpdateTarget()])
+      const result = await runDshPlugin(profile, ['add', selfUpdateTarget(updateBase(), remote)])
       if (result.exitCode !== 0) {
         console.warn(`[dshhub-market] self-update to ${remote} failed: ${result.stderr.slice(-300)}`)
       }

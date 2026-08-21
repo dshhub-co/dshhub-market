@@ -36,7 +36,7 @@ import { installSkill, isInstalledSkill, skillSpecMap, uninstallSkill, readInsta
 import { isStaleUpdate, parseIgnoredBuilds, parsePrepareNotAllowed, RELEASE_AGE_OVERRIDE, retargetCollections, validateAddedPlugins, withHoistRecovery } from './install.ts'
 import { asChannel, CHANNELS, DIST_TAG, resolveChannel, type Channel } from './channels.ts'
 import { checkUpdates, fetchNpmLatest, invalidateUpdates, isLocalPathSpec, isUpgrade, latestPublishedRecently, versionOnChannel } from './updates.ts'
-import { FORK_SELF_NAME, fetchOwnVersion, selfUpdateTarget } from './self-update.ts'
+import { FORK_SELF_NAME, fetchOwnVersion, selfUpdateTarget, updateBase } from './self-update.ts'
 import { createThemeManager, type LoaderEntry } from './themes.ts'
 import { readJsonBody, sameOrigin, sendJson } from './http.ts'
 import { restartAllowed, scheduleRestart, servingPort, trustedRestartRequest, trustedDownloadRequest } from './restart.ts'
@@ -1352,7 +1352,10 @@ export function mountMarketRoutes(
             // The market follows its channel; everything else is `latest`.
             const selfChannel = SELF_NAMES.has(name) ? activeChannel() : null
             const tag = selfChannel === null ? 'latest' : DIST_TAG[selfChannel]
-            const target = selfTgz ? selfUpdateTarget() : isGit ? spec.replace(/#.*$/, '') : `${name}@${tag}`
+            // 自更新目标带版本号：同 spec 重装会被 pnpm 短路（"Already up to
+            // date"），版本化 URL 才能保证真的换包。
+            const selfRemote = selfTgz ? await fetchOwnVersion() : null
+            const target = selfTgz ? selfUpdateTarget(updateBase(), selfRemote ?? '') : isGit ? spec.replace(/#.*$/, '') : `${name}@${tag}`
             // Never let `@latest` walk a profile BACKWARDS (#64 by @ZeroOrigin64):
             // a package whose latest dist-tag was left on an older release turns
             // this update into a downgrade that also rewrites an exact pin to
@@ -1367,7 +1370,7 @@ export function mountMarketRoutes(
             // rather than `latest`, which is not the tag being installed.
             if (selfTgz) {
               const installedVersion = readInstalledVersion(config.profile, name, activeProfileDir)
-              const remoteVersion = await fetchOwnVersion()
+              const remoteVersion = selfRemote
               const refuse = installedVersion !== null && remoteVersion !== null && !isUpgrade(installedVersion, remoteVersion)
               if (refuse) {
                 logEvent('info', 'update', `${name} refused: published=${remoteVersion} is not newer than installed=${installedVersion}`)

@@ -11,10 +11,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { loadRegistry } from './registry.ts'
+import { loadRegistry, type RegistryPlugin } from './registry.ts'
 import {
-  cleanHotDir, hotMount, hotUnmount, listHotMounts,
-  mountClientOnlyDeps, purgeMarketState, readMarketState, writeMarketState,
+  cleanHotDir, getOrCreateProfileKey, hotMount, hotUnmount, listHotMounts,
+  mountClientOnlyDeps, purgeMarketState, readMarketState, readUnlockedState,
+  writeMarketState, writeUnlockedState, type UnlockedBundleRecord,
 } from './hot.ts'
 import { createGroup, deleteGroup, removeFromGroups, renameGroup, setGroupMembers } from './groups.ts'
 import { exportLogs, logEvent } from './log.ts'
@@ -83,6 +84,9 @@ export interface MarketConfig {
 }
 
 const PROFILE_RE = /^[A-Za-z0-9_-]+$/
+
+/** 口令插件市场 API 地址（本地调试可 DSHHUB_API_URL=http://localhost:3000） */
+const DSHHUB_API = process.env.DSHHUB_API_URL ?? 'https://www.dshhub.co'
 
 /**
  * The market's own version, read once from its installed package.json.
@@ -674,6 +678,100 @@ export function mountMarketRoutes(
             logEvent('warn', 'registry', `catalog fetch failed: ${message}`)
             sendJson(response, 502, { error: message })
           }
+        } catch (error) {
+          sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
+        }
+      },
+    }),
+
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/profile-key',
+      handler: async (_request, response) => {
+        try {
+          sendJson(response, 200, { key: getOrCreateProfileKey(activeProfileDir) })
+        } catch (error) {
+          sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
+        }
+      },
+    }),
+
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/redeem',
+      handler: async (request, response) => {
+        if (request.method !== 'POST') {
+          response.writeHead(405, { allow: 'POST' })
+          response.end()
+          return
+        }
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'untrusted origin' })
+          return
+        }
+        try {
+          const body = (await readJsonBody(request)) as { code?: unknown }
+          const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : ''
+          if (code === '') {
+            sendJson(response, 400, { error: '口令不能为空 / passcode is required' })
+            return
+          }
+          const profileKey = getOrCreateProfileKey(activeProfileDir)
+          const upstream = await fetch(`${DSHHUB_API}/api/passcodes/redeem`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ code, profileKey }),
+            signal: AbortSignal.timeout(25_000),
+          })
+          const upstreamBody = (await upstream.json().catch(() => ({}))) as {
+            ok?: boolean
+            error?: string
+            bundle?: {
+              bundleId?: string
+              name?: string
+              description?: string
+              teachingLinks?: string
+              originalAuthors?: string
+              items?: UnlockedBundleRecord['items']
+            }
+          }
+          if (!upstream.ok || upstreamBody.ok !== true || upstreamBody.bundle === undefined) {
+            logEvent('warn', 'redeem', `code ${code}: rejected by upstream (${upstream.status})`)
+            sendJson(response, upstream.status === 429 ? 429 : 404, {
+              error: typeof upstreamBody.error === 'string' && upstreamBody.error !== ''
+                ? upstreamBody.error
+                : '口令已失效 / passcode is invalid',
+            })
+            return
+          }
+          const record: UnlockedBundleRecord = {
+            id: `r-${Date.now()}`,
+            bundleId: upstreamBody.bundle.bundleId ?? '',
+            name: upstreamBody.bundle.name ?? '',
+            description: upstreamBody.bundle.description ?? '',
+            teachingLinks: upstreamBody.bundle.teachingLinks ?? '',
+            originalAuthors: upstreamBody.bundle.originalAuthors ?? '',
+            items: upstreamBody.bundle.items ?? [],
+            redeemedAt: new Date().toISOString(),
+          }
+          const state = readUnlockedState(activeProfileDir)
+          state.bundles.unshift(record)
+          writeUnlockedState(activeProfileDir, state)
+          logEvent('info', 'redeem', `code ${code}: unlocked "${record.name}"`)
+          sendJson(response, 200, { ok: true, bundle: record })
+        } catch (error) {
+          logEvent('error', 'redeem', `redeem failed: ${error instanceof Error ? error.message : String(error)}`)
+          sendJson(response, 502, { error: error instanceof Error ? error.message : String(error) })
+        }
+      },
+    }),
+
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/unlocked',
+      handler: async (_request, response) => {
+        try {
+          sendJson(response, 200, { bundles: readUnlockedState(activeProfileDir).bundles })
         } catch (error) {
           sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
         }
@@ -1984,9 +2082,30 @@ export function mountMarketRoutes(
             }
             const url = typeof body.url === 'string' ? body.url : ''
             const registry = await loadRegistry()
-            const entry = registry.plugins.find(p => p.url.toLowerCase() === url.toLowerCase())
+            let entry = registry.plugins.find(p => p.url.toLowerCase() === url.toLowerCase())
             if (entry === undefined) {
-              logEvent('warn', 'install-rejected', `not in curated registry: ${url.slice(0, 120)}`)
+              // 口令解锁的商品：官方目录条目天然在 registry 里；本地插件条目
+              // （dshhub.co 下载地址）按解锁状态合成 entry —— 没核销过就不让装。
+              const unlockedItems = readUnlockedState(activeProfileDir).bundles.flatMap(b => b.items)
+              const match = unlockedItems.find(
+                it => typeof it.zip === 'string' && it.zip.toLowerCase() === url.toLowerCase(),
+              )
+              if (match !== undefined) {
+                entry = {
+                  name: typeof match.name === 'string' && match.name !== '' ? match.name : 'unlocked-plugin',
+                  owner: 'dshhub',
+                  url: `${DSHHUB_API}/plugin/unknown`,
+                  category: 'tools',
+                  description: { en: '', zh: '' },
+                  install: '',
+                  kind: match.kind === 'theme' || match.kind === 'tool' || match.kind === 'skill' ? match.kind : 'plugin',
+                  tier: match.tier === 'appearance' || match.tier === 'agentic' ? match.tier : 'utility',
+                  zip: url,
+                } as unknown as RegistryPlugin
+              }
+            }
+            if (entry === undefined) {
+              logEvent('warn', 'install-rejected', `not in curated registry or unlocked state: ${url.slice(0, 120)}`)
               sendJson(response, 400, { error: 'plugin is not in the curated registry' })
               return
             }

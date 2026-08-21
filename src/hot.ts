@@ -17,6 +17,7 @@
  */
 
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { asChannel, type Channel } from './channels.ts'
@@ -236,6 +237,77 @@ export function writeMarketState(profileDir: string, state: MarketState): void {
     // keeps deriving from the running build.
     ...(state.channel === undefined ? {} : { channel: state.channel }),
   }))
+}
+
+// ---- 口令解锁状态（口令插件市场）：独立 unlocked.json，不掺进 hot 状态 ----
+
+export interface UnlockedBundleItem {
+  type: 'local' | 'github'
+  pluginId?: string
+  url?: string
+  name?: string
+  kind?: string
+  tier?: string
+  zip?: string
+}
+
+export interface UnlockedBundleRecord {
+  id: string
+  bundleId: string
+  name: string
+  description: string
+  teachingLinks: string
+  originalAuthors: string
+  items: UnlockedBundleItem[]
+  redeemedAt: string
+}
+
+export interface UnlockedState {
+  profileKey: string
+  bundles: UnlockedBundleRecord[]
+}
+
+function unlockedFile(profileDir: string): string {
+  return join(profileDir, HOT_DIR, 'unlocked.json')
+}
+
+function isBundleRecord(value: unknown): value is UnlockedBundleRecord {
+  if (value === null || typeof value !== 'object') return false
+  const b = value as Partial<UnlockedBundleRecord>
+  return typeof b.id === 'string' && typeof b.name === 'string' && Array.isArray(b.items)
+}
+
+export function readUnlockedState(profileDir: string): UnlockedState {
+  try {
+    const raw = JSON.parse(readFileSync(unlockedFile(profileDir), 'utf8')) as {
+      profileKey?: unknown
+      bundles?: unknown
+    }
+    return {
+      profileKey: typeof raw.profileKey === 'string' && raw.profileKey !== '' ? raw.profileKey : '',
+      bundles: Array.isArray(raw.bundles) ? raw.bundles.filter(isBundleRecord) : [],
+    }
+  } catch {
+    return { profileKey: '', bundles: [] }
+  }
+}
+
+export function writeUnlockedState(profileDir: string, state: UnlockedState): void {
+  mkdirSync(join(profileDir, HOT_DIR), { recursive: true, mode: 0o700 })
+  writeFileSync(unlockedFile(profileDir), JSON.stringify(state))
+}
+
+/**
+ * 无感绑定：每个 profile 一次性生成的口令身份。
+ * 不注册、不填手机号、不绑机器码——买家只输码，这个 key 全程自动。
+ * 存于 profile 目录，重装市场 / 重启 DSH 不变。
+ */
+export function getOrCreateProfileKey(profileDir: string): string {
+  const state = readUnlockedState(profileDir)
+  if (state.profileKey !== '') return state.profileKey
+  state.profileKey = randomUUID()
+  writeUnlockedState(profileDir, state)
+  return state.profileKey
 }
 
 /** Plugins the user switched off; skipped by the boot re-mount. */

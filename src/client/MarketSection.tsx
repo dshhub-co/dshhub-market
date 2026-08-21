@@ -73,6 +73,27 @@ const TIER_TAB_KEYS: Record<string, string> = {
   agentic: 'tabAgentic',
 }
 
+/** 口令解锁（买家侧）：dshhub.co 核销返回的商品条目与解锁记录 */
+interface UnlockedBundleItem {
+  type: 'local' | 'github'
+  pluginId?: string
+  url?: string
+  name?: string
+  kind?: string
+  tier?: string
+  zip?: string
+}
+
+interface UnlockedBundle {
+  id: string
+  name: string
+  description: string
+  teachingLinks: string
+  originalAuthors: string
+  items: UnlockedBundleItem[]
+  redeemedAt: string
+}
+
 function HostDependencyDiagnostics({
   findings,
   t,
@@ -358,10 +379,17 @@ export function MarketSection(props: MarketSectionProps) {
   const [tab, setTab] = useState(() => {
     const saved = sessionStorage.getItem('dshm-tab')
     if (saved !== null) sessionStorage.removeItem('dshm-tab')
-    // 旧版「主题」标签已并入「外观与体验」档
-    const value = saved || 'discover'
-    return value === 'themes' ? 'appearance' : value
+    // 旧版目录标签（discover / 三档分类）已由「口令解锁」取代
+    const legacy = new Set(['discover', 'appearance', 'utility', 'agentic', 'themes'])
+    const value = saved ?? 'redeem'
+    return legacy.has(value) ? 'redeem' : value
   })
+  const [redeemCode, setRedeemCode] = useState('')
+  const [redeeming, setRedeeming] = useState(false)
+  const [redeemError, setRedeemError] = useState<string | null>(null)
+  const [redeemNotice, setRedeemNotice] = useState<string | null>(null)
+  const [unlocked, setUnlocked] = useState<UnlockedBundle[]>([])
+  const [unlockBusyUrl, setUnlockBusyUrl] = useState<string | null>(null)
   const [q, setQ] = useState('')
   /** Per-tab searches stay independent: catalog tabs / installed. */
   const [qInstalled, setQInstalled] = useState('')
@@ -650,6 +678,14 @@ export function MarketSection(props: MarketSectionProps) {
       })
       .catch(() => {})
     refreshInstalled()
+    fetch('/dsh-market/unlocked')
+      .then(res => res.json())
+      .then((body) => {
+        if (Array.isArray((body as { bundles?: unknown }).bundles)) {
+          setUnlocked((body as { bundles: UnlockedBundle[] }).bundles)
+        }
+      })
+      .catch(() => {})
   }, [refreshInstalled])
 
   // Pending-restart flags survive tab switches and page reloads, scoped to
@@ -870,6 +906,59 @@ export function MarketSection(props: MarketSectionProps) {
       })
       .catch(error => setInstallError(String(error)))
       .finally(() => setRollingBack(false))
+  }, [refreshInstalled])
+
+  const submitRedeem = useCallback(() => {
+    const code = redeemCode.trim().toUpperCase()
+    if (code === '' || redeeming) return
+    setRedeeming(true)
+    setRedeemError(null)
+    setRedeemNotice(null)
+    fetch('/dsh-market/redeem', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+      .then(res => res.json().then(body => ({ status: res.status, body })))
+      .then(({ status, body }) => {
+        if (status === 200 && body.ok && body.bundle) {
+          setUnlocked(prev => [body.bundle, ...prev])
+          setRedeemCode('')
+          setRedeemNotice(body.bundle.name)
+        } else {
+          setRedeemError(typeof body.error === 'string' ? body.error : `HTTP ${String(status)}`)
+        }
+      })
+      .catch(error => setRedeemError(String(error)))
+      .finally(() => setRedeeming(false))
+  }, [redeemCode, redeeming])
+
+  const installUnlockedItem = useCallback((item: UnlockedBundleItem) => {
+    const url = item.zip ?? item.url
+    if (typeof url !== 'string' || url === '') return
+    setInstallError(null)
+    setUnlockBusyUrl(url)
+    fetch('/dsh-market/install', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+      .then(res => res.json().then(body => ({ status: res.status, body })))
+      .then(({ status, body }) => {
+        if (status === 200 && body.ok) {
+          sessionStorage.setItem('dshm-tab', 'installed')
+          if (body.activation && typeof body.activation === 'object') {
+            setActivations(prev => ({ ...prev, ...body.activation }))
+          }
+          refreshInstalled()
+        } else if (body.cancelled === true) {
+          refreshInstalled()
+        } else {
+          setInstallError(typeof body.error === 'string' ? body.error : `HTTP ${String(status)}`)
+        }
+      })
+      .catch(error => setInstallError(String(error)))
+      .finally(() => setUnlockBusyUrl(null))
   }, [refreshInstalled])
 
   const compatibilitySummary = (risks: CompatibilityNotice['risks']): string => {
@@ -1827,14 +1916,7 @@ export function MarketSection(props: MarketSectionProps) {
           >{exportState === 'busy' ? t('exportingLog') : t('exportLog')}</Button>
         </div>
         <div className={css.tabs}>
-          <button className={tab === 'discover' ? `${css.tab} ${css.on}` : css.tab} onClick={() => { setTab('discover'); setCat('all') }}>{t('tabDiscover')}</button>
-          {/* 三档分类（外观与体验 / 工具与能力 / 智能体与技能）与「发现」并列，
-              取代旧「主题」标签；标签文案随目录数据本地化 */}
-          {TIER_TAB_IDS.map((id) => (
-            <button key={id} className={tab === id ? `${css.tab} ${css.on}` : css.tab} onClick={() => { setTab(id); setCat('all') }}>
-              {TIER_EMOJI[id]} {(data?.tiers?.[id] && (data.tiers[id]![lang] || data.tiers[id]!.en)) || t(TIER_TAB_KEYS[id])}
-            </button>
-          ))}
+          <button className={tab === 'redeem' ? `${css.tab} ${css.on}` : css.tab} onClick={() => setTab('redeem')}>{t('tabRedeem')}</button>
           <button className={tab === 'installed' ? `${css.tab} ${css.on}` : css.tab} onClick={() => { setTab('installed'); refreshInstalled(true) }}>
             {t('tabInstalled') + (Object.keys(installed).length > 0 ? ' (' + Object.keys(installed).length + ')' : '')}
             {hasUpdates && <StateDot state="error" size={7} className={css.dot} />}
@@ -2010,7 +2092,87 @@ export function MarketSection(props: MarketSectionProps) {
         ref={bodyRef}
         onScroll={e => setShowTop(e.currentTarget.scrollTop > 400)}
       >
-        {tab === 'backup'
+        {tab === 'redeem'
+          ? (
+              <div className={css.redeemWrap}>
+                <div className={css.redeemBox}>
+                  <div className={css.redeemTitle}>{t('redeemTitle')}</div>
+                  <div className={css.redeemRow}>
+                    <Input
+                      className={css.redeemInput}
+                      value={redeemCode}
+                      onChange={e => setRedeemCode(e.target.value.toUpperCase())}
+                      placeholder={t('redeemPh')}
+                      onKeyDown={e => { if (e.key === 'Enter') submitRedeem() }}
+                    />
+                    <Button
+                      variant="primary"
+                      disabled={redeeming || redeemCode.trim() === ''}
+                      onClick={submitRedeem}
+                    >{redeeming ? t('redeeming') : t('redeemBtn')}</Button>
+                  </div>
+                  <div className={css.redeemDemo}>{t('redeemDemo')}</div>
+                  {redeemError !== null && <div className={css.redeemError}>{redeemError}</div>}
+                  {redeemNotice !== null && (
+                    <div className={css.redeemOk}>{t('redeemOk').replace('{0}', redeemNotice)}</div>
+                  )}
+                </div>
+
+                <h3 className={css.unlockedTitle}>{t('unlockedTitle') + (unlocked.length > 0 ? ' (' + unlocked.length + ')' : '')}</h3>
+                {unlocked.length === 0 ? (
+                  <div className={css.empty}>{t('unlockedEmpty')}</div>
+                ) : (
+                  <div className={css.unlockedList}>
+                    {unlocked.map(bundle => (
+                      <div key={bundle.id} className={css.unlockedCard}>
+                        <div className={css.unlockedHead}>
+                          <b className={css.unlockedName}>{bundle.name}</b>
+                          <span className={css.unlockedAt}>
+                            {t('unlockedAt').replace('{0}', new Date(bundle.redeemedAt).toLocaleDateString())}
+                          </span>
+                        </div>
+                        {bundle.description !== '' && <div className={css.unlockedDesc}>{bundle.description}</div>}
+                        {bundle.teachingLinks !== '' && (
+                          <div className={css.unlockedLinks}>
+                            <span className={css.unlockedLabel}>{t('teachingLabel')}</span>
+                            {bundle.teachingLinks.split('\n').filter(Boolean).map((link, i) => (
+                              <a key={i} href={link} target="_blank" rel="noreferrer">{link}</a>
+                            ))}
+                          </div>
+                        )}
+                        {bundle.originalAuthors !== '' && (
+                          <div className={css.unlockedAuthors}>
+                            <span className={css.unlockedLabel}>{t('authoredBy')}</span>{bundle.originalAuthors}
+                          </div>
+                        )}
+                        {bundle.items.map((item, i) => {
+                          const installUrl = item.zip ?? item.url ?? ''
+                          const installedMatch = typeof item.name === 'string' && installed[item.name] !== undefined
+                          return (
+                            <div key={i} className={css.unlockedItem}>
+                              <span className={css.unlockedItemName}>
+                                {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
+                              </span>
+                              {installedMatch ? (
+                                <span className={css.unlockedInstalled}>{t('installedLabel')}</span>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={unlockBusyUrl === installUrl || installUrl === ''}
+                                  onClick={() => installUnlockedItem(item)}
+                                >{unlockBusyUrl === installUrl ? t('installing') : t('unlockInstall')}</Button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          : tab === 'backup'
           ? (
               <div className={css.backupGrid}>
                 <section className={css.backupCard}>

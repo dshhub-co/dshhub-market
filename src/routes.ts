@@ -28,6 +28,22 @@ import { hasLoadableEntry, INBOX_BUNDLES, profileDir, readInstalled, readInstall
 import { assessProfile, introducedRisks, type CompatibilityRisk } from './compatibility.ts'
 import { runningAgentIds, type AgentsLookup } from './agents.ts'
 import { analyzeProfile } from './check.ts'
+
+/**
+ * 同一口令包判定：bundleId 相同时同包；无 bundleId（演示码等）按名称 + 条目
+ * 地址集合判定。用于重复输码去重。
+ */
+function sameBundle(a: UnlockedBundleRecord, b: UnlockedBundleRecord): boolean {
+  if (a.bundleId !== '' && b.bundleId !== '') return a.bundleId === b.bundleId
+  if (a.name === '' || a.name !== b.name) return false
+  const keys = (r: UnlockedBundleRecord) =>
+    r.items
+      .map((i) => i.url ?? i.pluginId ?? '')
+      .filter((v) => v !== '')
+      .sort()
+      .join('|')
+  return keys(a) !== '' && keys(a) === keys(b)
+}
 import { applyBundleOrder, mergeOrder, readBundleRules, readBundleStack, validateOrder } from './order.ts'
 import { trialValidate } from './trial.ts'
 import { findInstalledAlias, gitAllowBuildsKey, installTargetFor } from './sources.ts'
@@ -773,9 +789,17 @@ export function mountMarketRoutes(
             redeemedAt: new Date().toISOString(),
           }
           const state = readUnlockedState(activeProfileDir)
-          state.bundles.unshift(record)
+          // 去重：同一个包（bundleId 相同；演示码等无 bundleId 的按名称+条目地址判同）
+          // 重复输码不产生重复卡片——已解锁的移到最上面，保留首次解锁时间。
+          const existing = state.bundles.find((b) => sameBundle(b, record))
+          if (existing) {
+            state.bundles = [existing, ...state.bundles.filter((b) => b !== existing)]
+            logEvent('info', 'redeem', `code ${code}: already unlocked "${record.name}", moved to top`)
+          } else {
+            state.bundles.unshift(record)
+            logEvent('info', 'redeem', `code ${code}: unlocked "${record.name}"`)
+          }
           writeUnlockedState(activeProfileDir, state)
-          logEvent('info', 'redeem', `code ${code}: unlocked "${record.name}"`)
           sendJson(response, 200, { ok: true, bundle: record })
         } catch (error) {
           logEvent('error', 'redeem', `redeem failed: ${error instanceof Error ? error.message : String(error)}`)

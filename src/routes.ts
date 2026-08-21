@@ -732,6 +732,15 @@ export function mountMarketRoutes(
               description?: string
               teachingLinks?: string
               originalAuthors?: string
+              sellerNote?: string
+              tutorialVideo?: string
+              gettingStarted?: string
+              faq?: string
+              supportHours?: string
+              updateNote?: string
+              contact?: string
+              creatorName?: string
+              bundleUpdatedAt?: string
               items?: UnlockedBundleRecord['items']
             }
           }
@@ -751,6 +760,15 @@ export function mountMarketRoutes(
             description: upstreamBody.bundle.description ?? '',
             teachingLinks: upstreamBody.bundle.teachingLinks ?? '',
             originalAuthors: upstreamBody.bundle.originalAuthors ?? '',
+            sellerNote: upstreamBody.bundle.sellerNote ?? '',
+            tutorialVideo: upstreamBody.bundle.tutorialVideo ?? '',
+            gettingStarted: upstreamBody.bundle.gettingStarted ?? '',
+            faq: upstreamBody.bundle.faq ?? '',
+            supportHours: upstreamBody.bundle.supportHours ?? '',
+            updateNote: upstreamBody.bundle.updateNote ?? '',
+            contact: upstreamBody.bundle.contact ?? '',
+            creatorName: upstreamBody.bundle.creatorName ?? '',
+            bundleUpdatedAt: upstreamBody.bundle.bundleUpdatedAt ?? '',
             items: upstreamBody.bundle.items ?? [],
             redeemedAt: new Date().toISOString(),
           }

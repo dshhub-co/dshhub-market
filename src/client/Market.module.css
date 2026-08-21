@@ -328,3 +328,27 @@
 .unlockedItem{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);padding-top:8px}
 .unlockedItemName{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .unlockedInstalled{font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,#16a34a)}
+
+/* ---- 解锁卡片 v2（买家体验：去商业味、有人味） ---- */
+.unlockedBy{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280)}
+.unlockedNote{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);border-left:3px solid var(--dsw-alias-brand-primary,#4f7cff);padding-left:10px;margin-top:2px}
+.unlockedUpdate{font-size:12px;line-height:18px;color:var(--dsw-alias-state-warning-primary,#d97706)}
+.unlockedVideo{display:flex;flex-direction:column;gap:4px;margin-top:2px}
+.unlockedFrame{width:100%;aspect-ratio:16/9;border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:10px;background:#000}
+.unlockedExternal{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary,#8b93a1)}
+.unlockedVideoLink{font-size:13px;line-height:20px;color:var(--dsw-alias-brand-primary,#4f7cff);text-decoration:none}
+.unlockedVideoLink:hover{text-decoration:underline}
+.unlockedSteps{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.unlockedStep{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328)}
+.unlockedFaq{display:flex;flex-direction:column;gap:4px;margin-top:2px}
+.unlockedFaqItem{border-top:1px dashed var(--dsw-alias-border-l2,#e5e7eb);padding-top:4px}
+.unlockedFaqQ{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);font-weight:600}
+.unlockedFaqA{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:pre-wrap}
+.unlockedContact{display:flex;flex-direction:column;gap:4px;margin-top:2px}
+.unlockedContactRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.unlockedContactKey{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary,#8b93a1);flex-shrink:0}
+.unlockedContactValue{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis}
+a.unlockedContactValue{color:var(--dsw-alias-brand-primary,#4f7cff);text-decoration:none}
+a.unlockedContactValue:hover{text-decoration:underline}
+.unlockedHours{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary,#8b93a1)}
+.unlockedAbout{font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary,#8b93a1);border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);padding-top:6px}

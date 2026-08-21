@@ -90,8 +90,87 @@ interface UnlockedBundle {
   description: string
   teachingLinks: string
   originalAuthors: string
+  sellerNote: string
+  tutorialVideo: string
+  gettingStarted: string
+  faq: string
+  supportHours: string
+  updateNote: string
+  contact: string
+  creatorName: string
+  bundleUpdatedAt: string
   items: UnlockedBundleItem[]
   redeemedAt: string
+}
+
+// ---- 解锁卡片 v2 的纯函数：视频解析 / FAQ / 联系方式 ----
+
+interface ParsedVideo {
+  kind: 'embed' | 'external'
+  embedUrl?: string
+  url: string
+}
+
+/** B站/YouTube 解析为内嵌地址；抖音/快手/视频号等解析不了 → 跳转打开。 */
+function parseVideo(url: string): ParsedVideo | null {
+  const u = (url ?? '').trim()
+  if (u === '') return null
+  let m = /^https?:\/\/(?:www\.)?bilibili\.com\/video\/(BV[0-9A-Za-z]+)/.exec(u)
+  if (m !== null) return { kind: 'embed', embedUrl: `https://player.bilibili.com/player.html?bvid=${m[1]}&autoplay=0`, url: u }
+  m = /^https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([0-9A-Za-z_-]{6,})/.exec(u)
+  if (m !== null) return { kind: 'embed', embedUrl: `https://www.youtube.com/embed/${m[1]}`, url: u }
+  m = /^https?:\/\/(?:www\.)?youtube\.com\/(?:shorts|embed)\/([0-9A-Za-z_-]{6,})/.exec(u)
+  if (m !== null) return { kind: 'embed', embedUrl: `https://www.youtube.com/embed/${m[1]}`, url: u }
+  m = /^https?:\/\/youtu\.be\/([0-9A-Za-z_-]{6,})/.exec(u)
+  if (m !== null) return { kind: 'embed', embedUrl: `https://www.youtube.com/embed/${m[1]}`, url: u }
+  return { kind: 'external', url: u }
+}
+
+interface FaqEntry { q: string; a: string }
+
+/** 每行一条「Q：… A：…」；A 可跨多行（挂在下一个 Q 之前）。 */
+function parseFaq(text: string): FaqEntry[] {
+  const out: FaqEntry[] = []
+  let cur: FaqEntry | null = null
+  for (const raw of (text ?? '').split('\n')) {
+    const line = raw.trim()
+    if (line === '') continue
+    const m = /^Q[:：]\s*(.*)$/.exec(line)
+    if (m !== null) {
+      cur = { q: m[1], a: '' }
+      out.push(cur)
+    } else if (cur !== null) {
+      cur.a = cur.a === '' ? line : `${cur.a}\n${line}`
+    }
+  }
+  return out.filter(f => f.q !== '' || f.a !== '')
+}
+
+interface ContactRow { label: string; value: string; kind: 'wechat' | 'link' | 'mail' | 'text' }
+
+/** 每行一条联系方式：微信 → 可复制；http 链接 → 跳转；邮箱 → mailto。 */
+function parseContacts(text: string): ContactRow[] {
+  const rows: ContactRow[] = []
+  for (const raw of (text ?? '').split('\n')) {
+    const line = raw.trim()
+    if (line === '') continue
+    if (/^https?:\/\//.test(line)) {
+      rows.push({ label: '链接', value: line, kind: 'link' })
+      continue
+    }
+    const m = /^([^:：]{1,20})[:：]\s*(.+)$/.exec(line)
+    if (m !== null) {
+      const key = m[1].trim()
+      const value = m[2].trim()
+      if (/微信|wechat/i.test(key)) rows.push({ label: key, value, kind: 'wechat' })
+      else if (/邮箱|mail/i.test(key)) rows.push({ label: key, value, kind: 'mail' })
+      else if (/^https?:\/\//.test(value)) rows.push({ label: key, value, kind: 'link' })
+      else rows.push({ label: key, value, kind: 'text' })
+    } else {
+      rows.push({ label: '', value: line, kind: 'text' })
+    }
+  }
+  return rows
 }
 
 function HostDependencyDiagnostics({
@@ -390,6 +469,14 @@ export function MarketSection(props: MarketSectionProps) {
   const [redeemNotice, setRedeemNotice] = useState<string | null>(null)
   const [unlocked, setUnlocked] = useState<UnlockedBundle[]>([])
   const [unlockBusyUrl, setUnlockBusyUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  /** 复制微信号等联系方式：一键复制 + 短暂反馈 */
+  const copyText = useCallback((text: string) => {
+    void navigator.clipboard?.writeText(text)
+    setCopied(text)
+    window.setTimeout(() => setCopied(cur => (cur === text ? null : cur)), 2000)
+  }, [])
   const [q, setQ] = useState('')
   /** Per-tab searches stay independent: catalog tabs / installed. */
   const [qInstalled, setQInstalled] = useState('')
@@ -2131,20 +2218,55 @@ export function MarketSection(props: MarketSectionProps) {
                             {t('unlockedAt').replace('{0}', new Date(bundle.redeemedAt).toLocaleDateString())}
                           </span>
                         </div>
-                        {bundle.description !== '' && <div className={css.unlockedDesc}>{bundle.description}</div>}
-                        {bundle.teachingLinks !== '' && (
-                          <div className={css.unlockedLinks}>
-                            <span className={css.unlockedLabel}>{t('teachingLabel')}</span>
-                            {bundle.teachingLinks.split('\n').filter(Boolean).map((link, i) => (
-                              <a key={i} href={link} target="_blank" rel="noreferrer">{link}</a>
-                            ))}
-                          </div>
+                        {(bundle.creatorName ?? '') !== '' && (
+                          <div className={css.unlockedBy}>{t('byAuthor').replace('{0}', bundle.creatorName)}</div>
                         )}
-                        {bundle.originalAuthors !== '' && (
-                          <div className={css.unlockedAuthors}>
-                            <span className={css.unlockedLabel}>{t('authoredBy')}</span>{bundle.originalAuthors}
-                          </div>
+                        {(bundle.sellerNote ?? '') !== '' && (
+                          <div className={css.unlockedNote}>「{bundle.sellerNote}」</div>
                         )}
+                        {(bundle.updateNote ?? '') !== '' && (
+                          <div className={css.unlockedUpdate}>🔔 {bundle.updateNote}</div>
+                        )}
+                        {(bundle.description ?? '') !== '' && (
+                          <div className={css.unlockedDesc}>{bundle.description}</div>
+                        )}
+
+                        {(() => {
+                          const video = parseVideo(bundle.tutorialVideo)
+                          if (video === null) return null
+                          return video.kind === 'embed'
+                            ? (
+                                <div className={css.unlockedVideo}>
+                                  <iframe
+                                    className={css.unlockedFrame}
+                                    src={video.embedUrl}
+                                    title={bundle.name}
+                                    allow="fullscreen"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <a className={css.unlockedExternal} href={video.url} target="_blank" rel="noreferrer">
+                                    {t('videoFallback')}
+                                  </a>
+                                </div>
+                              )
+                            : (
+                                <a className={css.unlockedVideoLink} href={video.url} target="_blank" rel="noreferrer">
+                                  ▶ {t('videoLabel')}（{t('openExternal')}）
+                                </a>
+                              )
+                        })()}
+
+                        {(() => {
+                          const steps = (bundle.gettingStarted ?? '').split('\n').map(s => s.trim()).filter(Boolean)
+                          if (steps.length === 0) return null
+                          return (
+                            <div className={css.unlockedSteps}>
+                              <span className={css.unlockedLabel}>{t('stepsLabel')}</span>
+                              {steps.map((s, i) => <div key={i} className={css.unlockedStep}>{i + 1}. {s}</div>)}
+                            </div>
+                          )
+                        })()}
+
                         {bundle.items.map((item, i) => {
                           const installUrl = item.zip ?? item.url ?? ''
                           const installedMatch = typeof item.name === 'string' && installed[item.name] !== undefined
@@ -2166,6 +2288,65 @@ export function MarketSection(props: MarketSectionProps) {
                             </div>
                           )
                         })}
+
+                        {(bundle.teachingLinks ?? '') !== '' && (
+                          <div className={css.unlockedLinks}>
+                            <span className={css.unlockedLabel}>{t('teachingLabel')}</span>
+                            {(bundle.teachingLinks ?? '').split('\n').filter(Boolean).map((link, i) => (
+                              <a key={i} href={link} target="_blank" rel="noreferrer">{link}</a>
+                            ))}
+                          </div>
+                        )}
+
+                        {(() => {
+                          const faqs = parseFaq(bundle.faq ?? '')
+                          if (faqs.length === 0) return null
+                          return (
+                            <div className={css.unlockedFaq}>
+                              <span className={css.unlockedLabel}>{t('faqLabel')}</span>
+                              {faqs.map((f, i) => (
+                                <div key={i} className={css.unlockedFaqItem}>
+                                  <div className={css.unlockedFaqQ}>▸ {f.q}</div>
+                                  <div className={css.unlockedFaqA}>{f.a}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })()}
+
+                        {(() => {
+                          const contacts = parseContacts(bundle.contact ?? '')
+                          if (contacts.length === 0 && (bundle.supportHours ?? '') === '') return null
+                          return (
+                            <div className={css.unlockedContact}>
+                              <span className={css.unlockedLabel}>{t('contactLabel')}</span>
+                              {contacts.map((c, i) => (
+                                <div key={i} className={css.unlockedContactRow}>
+                                  {c.label !== '' && <span className={css.unlockedContactKey}>{c.label}</span>}
+                                  {c.kind === 'link'
+                                    ? <a className={css.unlockedContactValue} href={c.value} target="_blank" rel="noreferrer">{c.value}</a>
+                                    : c.kind === 'mail'
+                                      ? <a className={css.unlockedContactValue} href={`mailto:${c.value}`}>{c.value}</a>
+                                      : <span className={css.unlockedContactValue}>{c.value}</span>}
+                                  {c.kind === 'wechat' && (
+                                    <Button variant="ghost" size="sm" onClick={() => copyText(c.value)}>
+                                      {copied === c.value ? t('copiedToast') : t('copyBtn')}
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                              {(bundle.supportHours ?? '') !== '' && (
+                                <div className={css.unlockedHours}>{bundle.supportHours}</div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {(bundle.originalAuthors ?? '') !== '' && (
+                          <div className={css.unlockedAbout}>
+                            {t('aboutLabel')}：{bundle.originalAuthors} · {t('trustedLabel')}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

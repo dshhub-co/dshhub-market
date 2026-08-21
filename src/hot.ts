@@ -258,6 +258,15 @@ export interface UnlockedBundleRecord {
   description: string
   teachingLinks: string
   originalAuthors: string
+  sellerNote: string
+  tutorialVideo: string
+  gettingStarted: string
+  faq: string
+  supportHours: string
+  updateNote: string
+  contact: string
+  creatorName: string
+  bundleUpdatedAt: string
   items: UnlockedBundleItem[]
   redeemedAt: string
 }

@@ -21,3 +21,5 @@ jobs:
       - run: npm run build
       - run: node scripts/preflight.mjs
       - run: node scripts/validate-registry.mjs
+      - name: 构建产物防漂移（lib/ 与 client/ 必须随源码提交，git 直装依赖它们）
+        run: git diff --exit-code -- lib client || (echo "构建产物与提交不一致：请运行 npm run build 并提交 lib/ 与 client/ 的变更" && exit 1)

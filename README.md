@@ -63,6 +63,8 @@ dsh plugin --profile web add github:dshhub-co/dshhub-market
 
 Restart `dsh web`, then open **Settings → Plugin Market**.
 
+Prefer the npm name — upgrades are smoothest that way. If you install from the website URL, run `pnpm install --update-checksums` in the profile directory after each release (the URL serves the latest tarball, so the lockfile checksum needs a refresh). GitHub installs work out of the box, with no build scripts to allow.
+
 On an older host the market disables itself and says so in the browser console — if the Plugin Market entry never appears, that's usually why. A desktop build may bundle a dsh older than the one npm would give you.
 
 ## Under the hood

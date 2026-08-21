@@ -74,6 +74,10 @@ dsh plugin --profile web add github:dshhub-co/dshhub-market
 
 重启 `dsh web`，打开 **设置 → 插件市场**。
 
+推荐用 npm 名字安装（版本升级最省心）。若用网站链接安装，每次发布新版本后
+需在 profile 目录跑一次 `pnpm install --update-checksums`（链接指向最新包，
+锁文件指纹需刷新）；GitHub 直装开箱即用，无需放行构建脚本。
+
 宿主太旧时市场会自我禁用，并在浏览器控制台说明原因——如果设置里始终没有
 「插件市场」这一项，通常就是这个原因。桌面端可能内置了比 npm 装到的更旧的 dsh。
 

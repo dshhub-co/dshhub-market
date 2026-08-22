@@ -91,6 +91,8 @@ export function buildManifest(item: ScannedItem, accountId: string, authorName: 
 
 /**
  * Package the selected item(s) into a zip and upload to the platform.
+ * 同一内容重复发布时平台会 409「该版本已存在」：自动把补丁版本号 +1 重试
+ * 一次（如 1.0.0 → 1.0.1），让「修复后重新发布」不要求用户改任何文件。
  */
 export async function publishItems(
   items: ScannedItem[],
@@ -112,25 +114,25 @@ export async function publishItems(
   // 1) Gather files from the source directory
   const sourceFiles = collectFiles(item.path, item.path)
 
-  // 2) Build manifest and add to the zip under the correct structure
-  const manifest = buildManifest(item, opts.accountId, opts.authorName)
-  if (opts.demoUrl) manifest.demo = opts.demoUrl
+  const baseManifest = buildManifest(item, opts.accountId, opts.authorName)
+  if (opts.demoUrl) baseManifest.demo = opts.demoUrl
 
   // Structure:
   //   skills/<name>/...   for skill kind
   //   presets/<name>/...  for preset kind
   //   manifest.json       at root
   const kindDir = item.kind === 'skill' ? 'skills' : 'presets'
-  const zipEntries: Zippable = {}
-  for (const [relPath, data] of Object.entries(sourceFiles)) {
-    zipEntries[`${kindDir}/${item.name}/${relPath}`] = data
-  }
-  zipEntries['manifest.json'] = new TextEncoder().encode(JSON.stringify(manifest, null, 2))
 
-  const zipped = zipSync(zipEntries, { level: 6 })
+  /** 用指定版本号打包一次并上传（多版本共享源文件，zip 内容仅 manifest 不同）。 */
+  async function attempt(version: string): Promise<{ status: number; body: PublishResult }> {
+    const zipEntries: Zippable = {}
+    for (const [relPath, data] of Object.entries(sourceFiles)) {
+      zipEntries[`${kindDir}/${item.name}/${relPath}`] = data
+    }
+    const manifest = { ...baseManifest, version }
+    zipEntries['manifest.json'] = new TextEncoder().encode(JSON.stringify(manifest, null, 2))
+    const zipped = zipSync(zipEntries, { level: 6 })
 
-  // 3) Upload via multipart/form-data
-  try {
     const formData = new FormData()
     formData.append('file', new Blob([zipped.buffer as ArrayBuffer], { type: 'application/zip' }), `${item.name}.zip`)
 
@@ -144,11 +146,34 @@ export async function publishItems(
       signal: AbortSignal.timeout(60_000),
     })
     const body = await response.json() as PublishResult
-    if (!response.ok || body.ok !== true) {
-      return { ok: false, error: body.error ?? `HTTP ${response.status}` }
+    return { status: response.status, body }
+  }
+
+  try {
+    let { status, body } = await attempt(baseManifest.version as string)
+    if (status === 409 && !body.ok) {
+      // 该版本已存在 → 补丁号 +1 重试一次（1.0.0 → 1.0.1）
+      const next = bumpPatch(baseManifest.version as string)
+      ;({ status, body } = await attempt(next))
+    }
+    if (status !== 200 || body.ok !== true) {
+      return { ok: false, error: body.error ?? `HTTP ${status}` }
     }
     return body
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
+}
+
+/** 补丁版本号 +1：1.0.0 → 1.0.1；非标准格式时追加 .1 兜底。 */
+export function bumpPatch(version: string): string {
+  const parts = version.split('.')
+  if (parts.length >= 2) {
+    const last = Number(parts[parts.length - 1])
+    if (Number.isFinite(last)) {
+      parts[parts.length - 1] = String(last + 1)
+      return parts.join('.')
+    }
+  }
+  return `${version}.1`
 }

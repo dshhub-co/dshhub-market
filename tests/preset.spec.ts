@@ -264,4 +264,32 @@ describe('publish manifest', () => {
     expect(uploadedUrl).toBe('https://www.dshhub.co/api/creator/upload')
     expect(authHeader).toBe('Bearer access-token-1')
   })
+
+  it('auto-bumps the patch version and retries when the platform rejects with 409', async () => {
+    makePreset('my-mode', 'name: 我的模式\ndescription: 测试模式\n')
+    const items = scanPresets(profileRoot())
+    const attempts: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+      const body = init?.body as FormData
+      const file = body.get('file') as File
+      const entries = unzipSync(new Uint8Array(await file.arrayBuffer()))
+      const manifest = JSON.parse(new TextDecoder().decode(entries['manifest.json'])) as { version: string }
+      attempts.push(manifest.version)
+      if (attempts.length === 1) {
+        return new Response(
+          JSON.stringify({ ok: false, error: '该版本已存在：dshhub-my-mode v1.0.0（发布新版本请修改 manifest 的 version）' }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      return new Response(
+        JSON.stringify({ ok: true, pluginId: 'p1', id: 'com.dshhub.my-mode', name: 'x', version: manifest.version, kind: 'preset' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }))
+
+    const result = await publishItems(items, { apiBase: 'https://www.dshhub.co', accountId: 'u1', authorName: '作者' })
+    expect(attempts).toEqual(['1.0.0', '1.0.1'])
+    expect(result.ok).toBe(true)
+    expect(result.version).toBe('1.0.1')
+  })
 })

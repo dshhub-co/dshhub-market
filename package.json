@@ -1,7 +1,7 @@
 {
   "name": "dshhub-market",
   "description": "DeepSeek Harness \u53e3\u4ee4\u63d2\u4ef6\u5e02\u573a\u5ba2\u6237\u7aef\uff1a\u8f93\u7801\u89e3\u9501\u63d2\u4ef6\uff0c\u8fde\u63a5\u521b\u4f5c\u8005\u4e0e\u4e70\u5bb6\uff08DSHHub.co \u9a71\u52a8\uff0cfork of dsh-market\uff09\u3002",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

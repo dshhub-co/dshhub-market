@@ -201,6 +201,18 @@ describe('publish manifest', () => {
     })
   })
 
+  it('builds valid reverse-domain ids from hyphenated and non-ASCII names', () => {
+    const base = { dir: 'presets/x', displayName: '', description: '', path: '/x' } as const
+    const hyphen = buildManifest({ ...base, kind: 'preset', name: 'erduo-broll' }, 'u', 'n')
+    expect(hyphen.id).toBe('com.dshhub.erduo-broll') // 平台正则允许连字符标签段
+
+    const chinese = buildManifest({ ...base, kind: 'skill', name: '剪片' }, 'u', 'n')
+    expect(chinese.id).toMatch(/^com\.dshhub\.preset-[a-z0-9]+$/)
+    // 确定性：同名两次生成相同 id（更新路径依赖同一 id）
+    const again = buildManifest({ ...base, kind: 'skill', name: '剪片' }, 'u', 'n')
+    expect(again.id).toBe(chinese.id)
+  })
+
   it('reports an error for an empty item list without hitting the network', async () => {
     const result = await publishItems([], { apiBase: 'http://127.0.0.1:1', accountId: 'u', authorName: 'n' })
     expect(result.ok).toBe(false)

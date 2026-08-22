@@ -46,10 +46,29 @@ function collectFiles(
 }
 
 /**
+ * 反域名 id：标签段只留小写字母/数字/连字符；全非 ASCII 目录名（如中文技能名）
+ * 用确定性哈希兜底，保证任意名字都能发布。
+ * 平台校验：/^[a-z0-9]+(-[a-z0-9]+)*(\.[a-z0-9]+(-[a-z0-9]+)*)+$/
+ */
+function reverseDomainId(name: string): string {
+  const label = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/^[-]+|[-]+$/g, '')
+    .replace(/-{2,}/g, '-')
+  if (label === '') {
+    let h = 0
+    for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0
+    return `com.dshhub.preset-${h.toString(36)}`
+  }
+  return `com.dshhub.${label}`
+}
+
+/**
  * Build a manifest.json object for the selected item.
  */
 export function buildManifest(item: ScannedItem, accountId: string, authorName: string): Record<string, unknown> {
-  const baseName = `com.dshhub.${item.name}`.toLowerCase().replace(/[^a-z0-9.]/g, '-')
+  const baseName = reverseDomainId(item.name)
   const manifest: Record<string, unknown> = {
     manifestVersion: 2,
     id: baseName,

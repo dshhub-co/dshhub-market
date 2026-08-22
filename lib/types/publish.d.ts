@@ -29,6 +29,8 @@ export interface PublishResult {
 export declare function buildManifest(item: ScannedItem, accountId: string, authorName: string): Record<string, unknown>;
 /**
  * Package the selected item(s) into a zip and upload to the platform.
+ * 同一内容重复发布时平台会 409「该版本已存在」：自动把补丁版本号 +1 重试
+ * 一次（如 1.0.0 → 1.0.1），让「修复后重新发布」不要求用户改任何文件。
  */
 export declare function publishItems(items: ScannedItem[], opts: {
     apiBase: string;
@@ -37,3 +39,5 @@ export declare function publishItems(items: ScannedItem[], opts: {
     authorName: string;
     demoUrl?: string;
 }): Promise<PublishResult>;
+/** 补丁版本号 +1：1.0.0 → 1.0.1；非标准格式时追加 .1 兜底。 */
+export declare function bumpPatch(version: string): string;

@@ -47,7 +47,7 @@ function sameBundle(a: UnlockedBundleRecord, b: UnlockedBundleRecord): boolean {
 import { applyBundleOrder, mergeOrder, readBundleRules, readBundleStack, validateOrder } from './order.ts'
 import { trialValidate } from './trial.ts'
 import { findInstalledAlias, gitAllowBuildsKey, installTargetFor } from './sources.ts'
-import { entryNeedsZip, materializeTgz } from './zip-source.ts'
+import { entryNeedsZip, materializeTgz, zipKind } from './zip-source.ts'
 import { installSkill, isInstalledSkill, skillSpecMap, uninstallSkill, readInstalledSkills } from './skill-install.ts'
 import { installPreset, isInstalledPreset, presetSpecMap, uninstallPreset, readInstalledPresets } from './preset-install.ts'
 import { scanPresets, scanSkills, type ScannedItem } from './preset-scan.ts'
@@ -2253,6 +2253,12 @@ export function mountMarketRoutes(
                 it => typeof it.zip === 'string' && it.zip.toLowerCase() === url.toLowerCase(),
               )
               if (match !== undefined) {
+                // 旧解锁卡片（平台补 kind 之前核销的）条目没有 kind：本地条目
+                // 只可能是 preset/skill，从 zip manifest 嗅探一次再定安装方式。
+                let kind = match.kind
+                if (kind !== 'theme' && kind !== 'tool' && kind !== 'skill' && kind !== 'preset') {
+                  kind = (await zipKind(url)) ?? kind
+                }
                 entry = {
                   name: typeof match.name === 'string' && match.name !== '' ? match.name : 'unlocked-plugin',
                   owner: 'dshhub',
@@ -2262,7 +2268,7 @@ export function mountMarketRoutes(
                   install: '',
                   // preset/skill 走目录拷贝安装（不走 pnpm），必须原样保留——
                   // 曾把 preset 降级成 'plugin' 导致走 pnpm add 而失败
-                  kind: match.kind === 'theme' || match.kind === 'tool' || match.kind === 'skill' || match.kind === 'preset' ? match.kind : 'plugin',
+                  kind: kind === 'theme' || kind === 'tool' || kind === 'skill' || kind === 'preset' ? kind : 'plugin',
                   tier: match.tier === 'appearance' || match.tier === 'agentic' ? match.tier : 'utility',
                   zip: url,
                 } as unknown as RegistryPlugin

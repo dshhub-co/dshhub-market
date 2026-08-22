@@ -88,6 +88,7 @@ interface ManifestLike {
   id?: unknown
   name?: unknown
   version?: unknown
+  kind?: unknown
 }
 
 /**
@@ -144,6 +145,23 @@ function ensurePackageJson(rooted: Record<string, Uint8Array>, manifest: Manifes
     version: manifest.version,
   }, null, 2))
   return rooted
+}
+
+/**
+ * 只读 zip 的 manifest kind（旧解锁卡片条目 kind 缺失时，判定该走拷贝
+ * 安装还是 pnpm）。本地条目只可能是 preset/skill（pnpm 类插件走
+ * github/npm 源，kind 在建包时就带上），读不到或异常返回 null。
+ */
+export async function zipKind(url: string): Promise<string | null> {
+  try {
+    const res = await marketFetch(url, { signal: AbortSignal.timeout(180_000) })
+    if (!res.ok) return null
+    const bytes = Buffer.from(await res.arrayBuffer())
+    const { manifest } = locateManifest(unzipSync(new Uint8Array(bytes)))
+    return typeof manifest.kind === 'string' && manifest.kind !== '' ? manifest.kind : null
+  } catch {
+    return null
+  }
 }
 
 /**

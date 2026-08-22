@@ -10,6 +10,12 @@
 import type { RegistryPlugin } from './registry.ts';
 export declare function entryNeedsZip(entry: RegistryPlugin): boolean;
 /**
+ * 只读 zip 的 manifest kind（旧解锁卡片条目 kind 缺失时，判定该走拷贝
+ * 安装还是 pnpm）。本地条目只可能是 preset/skill（pnpm 类插件走
+ * github/npm 源，kind 在建包时就带上），读不到或异常返回 null。
+ */
+export declare function zipKind(url: string): Promise<string | null>;
+/**
  * Materialize the entry's zip into a cached tarball path for `dsh plugin add`.
  * Content-addressed: the same zip maps to the same file, a new version maps
  * to a new one (which cleanly replaces the old file: spec in the profile).

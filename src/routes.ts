@@ -878,11 +878,14 @@ export function mountMarketRoutes(
           }
           const state = readUnlockedState(activeProfileDir)
           // 去重：同一个包（bundleId 相同；演示码等无 bundleId 的按名称+条目地址判同）
-          // 重复输码不产生重复卡片——已解锁的移到最上面，保留首次解锁时间。
+          // 重复输码不产生重复卡片——保留首次解锁时间，其余字段用最新核销响应
+          // 刷新：平台侧响应结构会演进（如条目补 kind），旧卡片可能是过期结构，
+          // 只挪位置不刷新会让「重新输码」永远拿不到新字段。
           const existing = state.bundles.find((b) => sameBundle(b, record))
           if (existing) {
-            state.bundles = [existing, ...state.bundles.filter((b) => b !== existing)]
-            logEvent('info', 'redeem', `code ${code}: already unlocked "${record.name}", moved to top`)
+            const refreshed = { ...record, redeemedAt: existing.redeemedAt }
+            state.bundles = [refreshed, ...state.bundles.filter((b) => b !== existing)]
+            logEvent('info', 'redeem', `code ${code}: already unlocked "${record.name}", refreshed`)
           } else {
             state.bundles.unshift(record)
             logEvent('info', 'redeem', `code ${code}: unlocked "${record.name}"`)

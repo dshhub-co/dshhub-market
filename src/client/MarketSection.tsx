@@ -484,6 +484,8 @@ export function MarketSection(props: MarketSectionProps) {
   const [redeeming, setRedeeming] = useState(false)
   const [redeemError, setRedeemError] = useState<string | null>(null)
   const [redeemNotice, setRedeemNotice] = useState<string | null>(null)
+  /** 口令卡片条目安装成功的可见反馈（#feedback）：按钮态 + 绿色提示。 */
+  const [unlockInstallOk, setUnlockInstallOk] = useState<string | null>(null)
   const [unlocked, setUnlocked] = useState<UnlockedBundle[]>([])
   const [unlockBusyUrl, setUnlockBusyUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
@@ -1052,6 +1054,7 @@ export function MarketSection(props: MarketSectionProps) {
     const url = item.zip ?? item.url
     if (typeof url !== 'string' || url === '') return
     setInstallError(null)
+    setUnlockInstallOk(null)
     setUnlockBusyUrl(url)
     fetch('/dsh-market/install', {
       method: 'POST',
@@ -1062,6 +1065,13 @@ export function MarketSection(props: MarketSectionProps) {
       .then(({ status, body }) => {
         if (status === 200 && body.ok) {
           sessionStorage.setItem('dshm-tab', 'installed')
+          // 立即应用响应里的完整 installed 地图（preset/skill 目录包也在
+          // 里面）：按钮立刻翻成「已安装」，不用等 refreshInstalled() 的
+          // 往返——之前正是等 /installed 才让成功安装毫无反馈。
+          if (body.installed && typeof body.installed === 'object') {
+            setInstalled(installedMap(body.installed))
+          }
+          setUnlockInstallOk(item.name ?? item.url ?? '')
           if (body.activation && typeof body.activation === 'object') {
             setActivations(prev => ({ ...prev, ...body.activation }))
           }
@@ -1971,7 +1981,7 @@ export function MarketSection(props: MarketSectionProps) {
 
   /** Installed plugins the market itself cannot group (#60); skill bundles
    * (manifest v2) are plain directories, not toggleable loader entries. */
-  const groupableNames = Object.keys(installed).filter(name => !String(installed[name] ?? '').startsWith('skill:') && name !== 'dsh-market' && name !== 'dshmarket' && name !== 'dshhub-market')
+  const groupableNames = Object.keys(installed).filter(name => !String(installed[name] ?? '').startsWith('skill:') && !String(installed[name] ?? '').startsWith('preset:') && name !== 'dsh-market' && name !== 'dshmarket' && name !== 'dshhub-market')
   /** Names already inside some group; everything else shows under "ungrouped". */
   const groupedNames = useMemo(() => new Set(Object.values(groups).flat()), [groups])
   const ungroupedNames = groupableNames.filter(name => !groupedNames.has(name))
@@ -2253,6 +2263,9 @@ export function MarketSection(props: MarketSectionProps) {
                   {redeemError !== null && <div className={css.redeemError}>{redeemError}</div>}
                   {redeemNotice !== null && (
                     <div className={css.redeemOk}>{t('redeemOk').replace('{0}', redeemNotice)}</div>
+                  )}
+                  {unlockInstallOk !== null && (
+                    <div className={css.redeemOk}>{t('unlockInstallOk').replace('{0}', unlockInstallOk)}</div>
                   )}
                 </div>
 

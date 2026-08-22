@@ -933,21 +933,26 @@ export function mountMarketRoutes(
           return
         }
         await dropStaleHotMounts()
-        // manifest v2: skill packages are directories under <profile>/skills/,
-        // not npm packages — merged into the same map with a `skill:` spec so
-        // the UI's install/uninstall/identity matching keeps working.
+        // manifest v2: skill/preset packages are directories under
+        // <profile>/skills|agent-presets/, not npm packages — merged into the
+        // same map with a `skill:`/`preset:` spec so the UI's install/
+        // uninstall/identity matching keeps working. (Presets were missing
+        // here, which made the unlocked-card button flip back to 安装 right
+        // after a successful preset install: refreshInstalled() never saw it.)
         const skillSpecs = skillSpecMap(activeProfileDir)
-        const installed = { ...readInstalled(config.profile, activeProfileDir), ...skillSpecs }
+        const presetSpecs = presetSpecMap(activeProfileDir)
+        const installed = { ...readInstalled(config.profile, activeProfileDir), ...skillSpecs, ...presetSpecs }
         const repoIdentities: Record<string, string[]> = {}
         const repoHints: Record<string, string[]> = {}
         for (const [name, spec] of Object.entries(installed)) {
-          if (spec.startsWith('skill:')) continue
+          if (spec.startsWith('skill:') || spec.startsWith('preset:')) continue
           const evidence = readInstalledRepoEvidence(config.profile, name, spec, activeProfileDir)
           if (evidence.identities.length > 0) repoIdentities[name] = evidence.identities
           if (evidence.hints.length > 0) repoHints[name] = evidence.hints
         }
         const present = Object.keys(installed).filter(
           name => installed[name].startsWith('skill:')
+            || installed[name].startsWith('preset:')
             || readInstalledVersion(config.profile, name, activeProfileDir) !== null,
         )
         // User-patch-layer state (port of dsh-plugin-hub): rows the user
@@ -962,8 +967,10 @@ export function mountMarketRoutes(
           activation[name] = installed[name].startsWith('skill:')
             // Skills are plain directories, usable the moment they exist.
             ? { state: 'live', reasons: ['技能包：已装入 profile skills 目录（不走 pnpm）'], bundle: false, hot: false }
-            : verifyActivation(config.profile, name, live, activeProfileDir,
-                disabled.has(name) || patchFlags.disabled.includes(name))
+            : installed[name].startsWith('preset:')
+              ? { state: 'live', reasons: ['预设包：已装入 profile agent-presets 目录（不走 pnpm）'], bundle: false, hot: false }
+              : verifyActivation(config.profile, name, live, activeProfileDir,
+                  disabled.has(name) || patchFlags.disabled.includes(name))
         }
         const diagnostics = diagnosePackageManifests(Object.keys(installed).map(packageName => ({
           packageName,
@@ -1367,7 +1374,14 @@ export function mountMarketRoutes(
           channel: activeChannel(),
           channels: CHANNELS,
           restart: restartAllowed(config),
-          installed: readInstalled(config.profile, activeProfileDir),
+          // Same merged map as /dsh-market/installed: the UI's poll compares
+          // these 1:1 (sameInstalledMap) — packages-only here made it always
+          // differ once a skill/preset was installed, re-fetching every poll.
+          installed: {
+            ...readInstalled(config.profile, activeProfileDir),
+            ...skillSpecMap(activeProfileDir),
+            ...presetSpecMap(activeProfileDir),
+          },
         })
       },
     }),
@@ -2047,10 +2061,6 @@ export function mountMarketRoutes(
               sendJson(response, 400, { error: 'the market cannot uninstall itself; use the dsh CLI' })
               return
             }
-            if (readInstalled(config.profile, activeProfileDir)[name] === undefined) {
-              sendJson(response, 400, { error: 'plugin is not installed' })
-              return
-            }
             const busyAgents = runningAgentsForGuard()
             if (busyAgents.length > 0) {
               logEvent('warn', 'uninstall-blocked', `${name}: refused while agents are running — ${busyAgents.join(', ')}`)
@@ -2062,6 +2072,10 @@ export function mountMarketRoutes(
               return
             }
             // manifest v2: skill packages uninstall by removing their dirs.
+            // These branches must run BEFORE the readInstalled guard below:
+            // directory bundles live outside package state.json, so the guard
+            // used to 400 every skill/preset uninstall before ever reaching
+            // them.
             if (isInstalledSkill(activeProfileDir, name)) {
               const record = readInstalledSkills(activeProfileDir)[name]
               const removed = uninstallSkill(activeProfileDir, name)
@@ -2072,7 +2086,7 @@ export function mountMarketRoutes(
                 // Directory removal is immediate — no restart banner needed.
                 hot: true,
                 skill: record,
-                installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir) },
+                installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir), ...presetSpecMap(activeProfileDir) },
               })
               return
             }
@@ -2088,6 +2102,10 @@ export function mountMarketRoutes(
                 preset: record,
                 installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir), ...presetSpecMap(activeProfileDir) },
               })
+              return
+            }
+            if (readInstalled(config.profile, activeProfileDir)[name] === undefined) {
+              sendJson(response, 400, { error: 'plugin is not installed' })
               return
             }
             pendingRollbacks.clear()
@@ -2295,7 +2313,7 @@ export function mountMarketRoutes(
                   activation: {
                     [record.name]: { state: 'live', reasons: ['技能包：已装入 profile skills 目录（不走 pnpm）'], bundle: false, hot: false },
                   },
-                  installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir) },
+                  installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir), ...presetSpecMap(activeProfileDir) },
                 })
               } catch (error) {
                 logEvent('error', 'install', `${entry.name}: skill install failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -2525,7 +2543,14 @@ export function mountMarketRoutes(
               timedOut: result.timedOut,
               stdout: result.stdout,
               stderr: result.stderr,
-              installed,
+              // Full merged map (packages + skill/preset directory bundles) so
+              // the UI can apply it verbatim: package-only here made a
+              // concurrent skill/preset row vanish from the map momentarily.
+              installed: {
+                ...installed,
+                ...skillSpecMap(activeProfileDir),
+                ...presetSpecMap(activeProfileDir),
+              },
             })
           })
         } catch (error) {

@@ -85,6 +85,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			unlockedAt: "解锁于 {0}",
 			unlockInstall: "安装",
 			installedLabel: "已安装",
+			unlockInstallOk: "安装成功：{0}，可在「已安装」里看到它",
 			teachingLabel: "使用指南",
 			byAuthor: "由 {0} 提供",
 			videoLabel: "教程视频",
@@ -432,6 +433,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			unlockedAt: "Unlocked {0}",
 			unlockInstall: "Install",
 			installedLabel: "Installed",
+			unlockInstallOk: "Installed: {0} — find it in the Installed tab",
 			teachingLabel: "Guides",
 			byAuthor: "Provided by {0}",
 			videoLabel: "Tutorial video",
@@ -2893,6 +2895,8 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			const [redeeming, setRedeeming] = (0, react.useState)(false);
 			const [redeemError, setRedeemError] = (0, react.useState)(null);
 			const [redeemNotice, setRedeemNotice] = (0, react.useState)(null);
+			/** 口令卡片条目安装成功的可见反馈（#feedback）：按钮态 + 绿色提示。 */
+			const [unlockInstallOk, setUnlockInstallOk] = (0, react.useState)(null);
 			const [unlocked, setUnlocked] = (0, react.useState)([]);
 			const [unlockBusyUrl, setUnlockBusyUrl] = (0, react.useState)(null);
 			const [copied, setCopied] = (0, react.useState)(null);
@@ -3393,6 +3397,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				const url = item.zip ?? item.url;
 				if (typeof url !== "string" || url === "") return;
 				setInstallError(null);
+				setUnlockInstallOk(null);
 				setUnlockBusyUrl(url);
 				fetch("/dsh-market/install", {
 					method: "POST",
@@ -3404,6 +3409,8 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				}))).then(({ status, body }) => {
 					if (status === 200 && body.ok) {
 						sessionStorage.setItem("dshm-tab", "installed");
+						if (body.installed && typeof body.installed === "object") setInstalled(installedMap(body.installed));
+						setUnlockInstallOk(item.name ?? item.url ?? "");
 						if (body.activation && typeof body.activation === "object") setActivations((prev) => ({
 							...prev,
 							...body.activation
@@ -4429,7 +4436,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			]);
 			/** Installed plugins the market itself cannot group (#60); skill bundles
 			* (manifest v2) are plain directories, not toggleable loader entries. */
-			const groupableNames = Object.keys(installed).filter((name) => !String(installed[name] ?? "").startsWith("skill:") && name !== "dsh-market" && name !== "dshmarket" && name !== "dshhub-market");
+			const groupableNames = Object.keys(installed).filter((name) => !String(installed[name] ?? "").startsWith("skill:") && !String(installed[name] ?? "").startsWith("preset:") && name !== "dsh-market" && name !== "dshmarket" && name !== "dshhub-market");
 			/** Names already inside some group; everything else shows under "ungrouped". */
 			const groupedNames = (0, react.useMemo)(() => new Set(Object.values(groups).flat()), [groups]);
 			const ungroupedNames = groupableNames.filter((name) => !groupedNames.has(name));
@@ -4876,6 +4883,10 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 										redeemNotice !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 											className: Market_module_css_default.redeemOk,
 											children: t("redeemOk").replace("{0}", redeemNotice)
+										}),
+										unlockInstallOk !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+											className: Market_module_css_default.redeemOk,
+											children: t("unlockInstallOk").replace("{0}", unlockInstallOk)
 										})
 									]
 								}),

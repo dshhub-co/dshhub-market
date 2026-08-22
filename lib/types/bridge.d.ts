@@ -9,6 +9,9 @@
  * InstallHarnessButton keeps working):
  *   GET  /health   → { ok, bridge: 'dshhub-market', version, profile }
  *   POST /install  → body { id: <dshhub plugin uuid> } → { ok, message|error }
+ *   GET  /dsh-market/publish/scan  → { presets, skills }（本机扫描，供发布页勾选）
+ *   POST /dsh-market/publish/upload → body { items, token, accountId, authorName, demoUrl? }
+ *        → 打包选中项 → POST 平台 /api/creator/upload（Bearer token 鉴权）
  */
 import { createServer } from 'node:http';
 export declare const PORTS: number[];

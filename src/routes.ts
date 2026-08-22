@@ -49,6 +49,9 @@ import { trialValidate } from './trial.ts'
 import { findInstalledAlias, gitAllowBuildsKey, installTargetFor } from './sources.ts'
 import { entryNeedsZip, materializeTgz } from './zip-source.ts'
 import { installSkill, isInstalledSkill, skillSpecMap, uninstallSkill, readInstalledSkills } from './skill-install.ts'
+import { installPreset, isInstalledPreset, presetSpecMap, uninstallPreset, readInstalledPresets } from './preset-install.ts'
+import { scanPresets, scanSkills, type ScannedItem } from './preset-scan.ts'
+import { publishItems } from './publish.ts'
 import { isStaleUpdate, parseIgnoredBuilds, parsePrepareNotAllowed, RELEASE_AGE_OVERRIDE, retargetCollections, validateAddedPlugins, withHoistRecovery } from './install.ts'
 import { asChannel, CHANNELS, DIST_TAG, resolveChannel, type Channel } from './channels.ts'
 import { checkUpdates, fetchNpmLatest, invalidateUpdates, isLocalPathSpec, isUpgrade, latestPublishedRecently, versionOnChannel } from './updates.ts'
@@ -535,6 +538,91 @@ export function mountMarketRoutes(
   }
 
   const disposers = [
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/publish/scan',
+      handler: async (_request, response) => {
+        try {
+          const presets = scanPresets(activeProfileDir)
+          const skills = scanSkills(activeProfileDir)
+          sendJson(response, 200, { presets, skills })
+        } catch (error) {
+          sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
+        }
+      },
+    }),
+
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/publish/upload',
+      handler: async (request, response) => {
+        if (request.method !== 'POST') {
+          response.writeHead(405, { allow: 'POST' })
+          response.end()
+          return
+        }
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'untrusted origin' })
+          return
+        }
+        try {
+          await withMutationLock(response, 'write', async () => {
+            const body = (await readJsonBody(request, 64 * 1024)) as {
+              items?: unknown
+              token?: string
+              accountId?: string
+              authorName?: string
+              demoUrl?: string
+            }
+
+            // Validate items
+            if (!Array.isArray(body.items) || body.items.length === 0) {
+              sendJson(response, 400, { error: 'items is required (non-empty array)' })
+              return
+            }
+            if (!body.accountId || typeof body.accountId !== 'string') {
+              sendJson(response, 400, { error: 'accountId is required' })
+              return
+            }
+
+            // Re-scan to get the actual paths (don't trust client-supplied paths)
+            const allScanned = [...scanPresets(activeProfileDir), ...scanSkills(activeProfileDir)]
+            const selected: ScannedItem[] = []
+            for (const raw of body.items as Array<{ kind?: string; name?: string }>) {
+              if (typeof raw.kind !== 'string' || typeof raw.name !== 'string') continue
+              const match = allScanned.find(s => s.kind === raw.kind && s.name === raw.name)
+              if (match !== undefined && !selected.some(s => s.kind === match.kind && s.name === match.name)) {
+                selected.push(match)
+              }
+            }
+            if (selected.length === 0) {
+              sendJson(response, 400, { error: 'no matching items found in the local profile scan — re-scan first' })
+              return
+            }
+
+            const result = await publishItems(selected, {
+              apiBase: DSHHUB_API,
+              token: typeof body.token === 'string' ? body.token : undefined,
+              accountId: body.accountId,
+              authorName: typeof body.authorName === 'string' ? body.authorName : '',
+              demoUrl: typeof body.demoUrl === 'string' ? body.demoUrl : undefined,
+            })
+            if (!result.ok) {
+              logEvent('error', 'publish', `upload failed: ${result.error ?? 'unknown'}`)
+              sendJson(response, 502, result)
+              return
+            }
+            logEvent('info', 'publish', `published ${result.name} (${result.id}) v${result.version}`)
+            sendJson(response, 200, result)
+          })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          logEvent('error', 'publish', `route error: ${message}`)
+          sendJson(response, 500, { error: message })
+        }
+      },
+    }),
+
     host.webServer.register({
       kind: 'exact',
       path: '/dsh-market/backup',
@@ -1985,6 +2073,20 @@ export function mountMarketRoutes(
               })
               return
             }
+            // manifest v2: preset packages uninstall by removing their dirs.
+            if (isInstalledPreset(activeProfileDir, name)) {
+              const record = readInstalledPresets(activeProfileDir)[name]
+              const removed = uninstallPreset(activeProfileDir, name)
+              logEvent(removed ? 'info' : 'error', 'uninstall',
+                `${name}: preset bundle ${removed ? `removed (${record?.presets.join(', ') ?? ''})` : 'not found'}`)
+              sendJson(response, removed ? 200 : 400, {
+                ok: removed,
+                hot: true,
+                preset: record,
+                installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir), ...presetSpecMap(activeProfileDir) },
+              })
+              return
+            }
             pendingRollbacks.clear()
             const beforeInstalled = readInstalled(config.profile, activeProfileDir)
             // isDisabled comes from the patch layer (#130) — keep it while the
@@ -2186,6 +2288,28 @@ export function mountMarketRoutes(
                 })
               } catch (error) {
                 logEvent('error', 'install', `${entry.name}: skill install failed: ${error instanceof Error ? error.message : String(error)}`)
+                sendJson(response, 502, { error: error instanceof Error ? error.message : String(error) })
+              }
+              return
+            }
+            // manifest v2: preset packages install as plain directories under
+            // <profile>/agent-presets/ — they are NOT npm packages, so they never go
+            // through pnpm. The registry allowlist check above still applies.
+            if (entry.kind === 'preset') {
+              try {
+                const record = await installPreset(activeProfileDir, entry)
+                logEvent('info', 'install', `${entry.name}: preset bundle installed (${record.presets.join(', ')})`)
+                sendJson(response, 200, {
+                  ok: true,
+                  hot: true,
+                  preset: record,
+                  activation: {
+                    [record.name]: { state: 'live', reasons: ['预设包：已装入 profile agent-presets 目录（不走 pnpm）'], bundle: false, hot: false },
+                  },
+                  installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir), ...presetSpecMap(activeProfileDir) },
+                })
+              } catch (error) {
+                logEvent('error', 'install', `${entry.name}: preset install failed: ${error instanceof Error ? error.message : String(error)}`)
                 sendJson(response, 502, { error: error instanceof Error ? error.message : String(error) })
               }
               return

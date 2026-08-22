@@ -9,6 +9,9 @@
  * InstallHarnessButton keeps working):
  *   GET  /health   → { ok, bridge: 'dshhub-market', version, profile }
  *   POST /install  → body { id: <dshhub plugin uuid> } → { ok, message|error }
+ *   GET  /dsh-market/publish/scan  → { presets, skills }（本机扫描，供发布页勾选）
+ *   POST /dsh-market/publish/upload → body { items, token, accountId, authorName, demoUrl? }
+ *        → 打包选中项 → POST 平台 /api/creator/upload（Bearer token 鉴权）
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -18,10 +21,15 @@ import { installTargetFor } from './sources.ts'
 import { runDshPlugin } from './dsh-cli.ts'
 import { readOwnVersion } from './self-update.ts'
 import { installSkill } from './skill-install.ts'
+import { installPreset } from './preset-install.ts'
+import { scanPresets, scanSkills, type ScannedItem } from './preset-scan.ts'
+import { publishItems, type PublishResult } from './publish.ts'
 import { profileDir } from './profile.ts'
 
 export const PORTS = [3750, 3751, 3752, 3753, 3754]
 const MAX_BODY = 64 * 1024
+/** 口令插件市场 API 地址（本地调试可 DSHHUB_API_URL=http://localhost:3000） */
+const DSHHUB_API = process.env.DSHHUB_API_URL ?? 'https://www.dshhub.co'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -86,6 +94,15 @@ interface InstallOutcome {
   error?: string
 }
 
+/** 发布上传请求体：items 只带 kind+name，实际路径由本机重扫得到（不信任客户端路径）。 */
+interface PublishUploadBody {
+  items?: Array<{ kind?: string; name?: string }>
+  token?: string
+  accountId?: string
+  authorName?: string
+  demoUrl?: string
+}
+
 /**
  * Install a catalog entry into the given profile. Two request shapes:
  *  - `{ id, token? }`  — a dshhub-uploaded plugin (uuid lookup); `token` is
@@ -117,6 +134,15 @@ async function installEntry(body: Record<string, unknown>, profile: string): Pro
     try {
       const record = await installSkill(profileDir(profile), entry)
       return { ok: true, message: `已安装技能包 ${entry.name}（${record.skills.join('、')} → profile skills 目录）` }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+  // manifest v2: preset packages copy into the profile agent-presets dir, no pnpm.
+  if (entry.kind === 'preset') {
+    try {
+      const record = await installPreset(profileDir(profile), entry)
+      return { ok: true, message: `已安装预设包 ${entry.name}（${record.presets.join('、')} → profile agent-presets 目录）` }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
@@ -175,8 +201,77 @@ export function createBridgeServer(opts: { profile: string }): ReturnType<typeof
       return
     }
 
+    if (req.method === 'GET' && url === '/dsh-market/publish/scan') {
+      try {
+        const dir = profileDir(profile)
+        send(res, 200, { presets: scanPresets(dir), skills: scanSkills(dir) })
+      } catch (error) {
+        send(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) })
+      }
+      return
+    }
+
+    if (req.method === 'POST' && url === '/dsh-market/publish/upload') {
+      readBody(req)
+        .then((buf) => {
+          let body: PublishUploadBody = {}
+          try { body = JSON.parse(buf.toString('utf8') || '{}') as PublishUploadBody } catch { /* empty body */ }
+          return enqueueInstall(() => publishUpload(body, profile))
+        })
+        .then((result) => send(res, result.ok ? 200 : 400, result))
+        .catch(() => send(res, 400, { ok: false, error: '请求无效' }))
+      return
+    }
+
     send(res, 404, { ok: false, error: 'not found' })
   })
+}
+
+/**
+ * 打包发布：重扫本机 profile，把 body.items 里 kind+name 匹配到的项
+ * 交给 publishItems（客户端打包 zip → 上传平台 /api/creator/upload）。
+ */
+async function publishUpload(body: PublishUploadBody, profile: string): Promise<PublishResult> {
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return { ok: false, error: '请先选择要发布的内容' }
+  }
+  if (typeof body.accountId !== 'string' || body.accountId === '') {
+    return { ok: false, error: '缺少账号信息：请先在 dshhub.co 登录' }
+  }
+  const dir = profileDir(profile)
+  const allScanned = [...scanPresets(dir), ...scanSkills(dir)]
+  const selected: ScannedItem[] = []
+  for (const raw of body.items) {
+    if (typeof raw.kind !== 'string' || typeof raw.name !== 'string') continue
+    const match = allScanned.find((s) => s.kind === raw.kind && s.name === raw.name)
+    if (match !== undefined && !selected.some((s) => s.kind === match.kind && s.name === match.name)) {
+      selected.push(match)
+    }
+  }
+  if (selected.length === 0) {
+    return { ok: false, error: '选中的内容未在本机扫描结果中找到，请先重新扫描' }
+  }
+  // 每个条目独立打包发布（一次一个 zip/plugin）；任一失败立即返回该错误。
+  const published: NonNullable<PublishResult['published']> = []
+  for (const item of selected) {
+    const result = await publishItems([item], {
+      apiBase: DSHHUB_API,
+      token: typeof body.token === 'string' && body.token !== '' ? body.token : undefined,
+      accountId: body.accountId,
+      authorName: typeof body.authorName === 'string' ? body.authorName : '',
+      demoUrl: typeof body.demoUrl === 'string' && body.demoUrl !== '' ? body.demoUrl : undefined,
+    })
+    if (!result.ok) return result
+    if (result.name !== undefined && result.id !== undefined) {
+      published.push({
+        name: result.name,
+        id: result.id,
+        kind: result.kind ?? item.kind,
+        version: result.version ?? '0.0.0',
+      })
+    }
+  }
+  return { ok: true, published }
 }
 
 async function probeBridge(port: number): Promise<boolean> {

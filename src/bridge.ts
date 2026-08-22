@@ -95,7 +95,7 @@ interface InstallOutcome {
 }
 
 /** 发布上传请求体：items 只带 kind+name，实际路径由本机重扫得到（不信任客户端路径）。 */
-interface PublishUploadBody {
+export interface PublishUploadBody {
   items?: Array<{ kind?: string; name?: string }>
   token?: string
   accountId?: string
@@ -231,7 +231,7 @@ export function createBridgeServer(opts: { profile: string }): ReturnType<typeof
  * 打包发布：重扫本机 profile，把 body.items 里 kind+name 匹配到的项
  * 交给 publishItems（客户端打包 zip → 上传平台 /api/creator/upload）。
  */
-async function publishUpload(body: PublishUploadBody, profile: string): Promise<PublishResult> {
+export async function publishUpload(body: PublishUploadBody, profile: string): Promise<PublishResult> {
   if (!Array.isArray(body.items) || body.items.length === 0) {
     return { ok: false, error: '请先选择要发布的内容' }
   }

@@ -1,11 +1,14 @@
 /**
- * Scan the local DSH profile for custom agent presets (agent.cordis.yml files
- * under <profile>/agent-presets/) and skills (SKILL.md under <profile>/skills/)
- * that the creator can publish to the market.
+ * Scan the local DSH for custom agent presets and skills that the creator
+ * can publish to the market:
+ *   - presets: <profile>/agent-presets/ (market-installed) AND the DSH-wide
+ *     library <dsh-home>/.agent-presets/ (creator-authored modes — "已调好的
+ *     模式"), each candidate dir containing agent.cordis.yml
+ *   - skills: SKILL.md under <profile>/skills/
  */
 
+import { dirname, join } from 'node:path'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
 
 export interface ScannedItem {
   kind: 'preset' | 'skill'
@@ -17,6 +20,7 @@ export interface ScannedItem {
 }
 
 const PRESET_YML = 'agent.cordis.yml'
+const PRESET_META = 'preset.yml'
 const SKILL_MD = 'SKILL.md'
 /** Hidden state dirs that should never be scanned as publishable content. */
 const SKIP_DIRS = new Set(['.dshhub', '.git', 'node_modules', '__MACOSX'])
@@ -29,45 +33,66 @@ function isDir(path: string): boolean {
   }
 }
 
+/** 极简 YAML 顶层标量解析：取 name / description 两个键，读不到返回空。 */
+function readYamlKeys(file: string): { name?: string; description?: string } {
+  try {
+    const text = readFileSync(file, 'utf8')
+    const out: { name?: string; description?: string } = {}
+    for (const line of text.split(/\r?\n/)) {
+      const idx = line.indexOf(':')
+      if (idx <= 0 || line.startsWith(' ') || line.startsWith('#')) continue
+      const key = line.slice(0, idx).trim()
+      const value = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '')
+      if (key === 'name' && out.name === undefined && value) out.name = value
+      else if (key === 'description' && out.description === undefined && value) out.description = value
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
 /**
- * Scan <profile>/agent-presets/ for preset directories.
- * Each directory containing agent.cordis.yml is a candidate.
+ * 一个 profile 可发布的预设来源：
+ *   - <profile>/agent-presets/   市场安装位（本 profile 已装的预设）
+ *   - <dsh-home>/.agent-presets/ DSH 全局预设库（创作者自己调好的模式）
+ * 默认布局 <home>/profiles/<name> → <home>/.agent-presets；显式目录主机
+ * （desktop 自管 profile 位置）若猜不到库路径，由 existsSync 兜底跳过。
+ */
+function presetRoots(profileDirectory: string): string[] {
+  const roots = [join(profileDirectory, 'agent-presets')]
+  roots.push(join(dirname(dirname(profileDirectory)), '.agent-presets'))
+  return roots.filter(existsSync)
+}
+
+/**
+ * Scan preset roots for preset directories (each containing agent.cordis.yml).
+ * 元数据：preset.yml（DSH 原生作者元数据）优先，其次 agent.cordis.yml 顶层
+ * name/description，最后回退目录名——创作者不需要为发布额外写任何文件。
  */
 export function scanPresets(profileDirectory: string): ScannedItem[] {
-  const root = join(profileDirectory, 'agent-presets')
-  if (!existsSync(root)) return []
   const out: ScannedItem[] = []
-  for (const name of readdirSync(root)) {
-    if (name.startsWith('.') || SKIP_DIRS.has(name)) continue
-    const dir = join(root, name)
-    if (!isDir(dir)) continue
-    const ymlPath = join(dir, PRESET_YML)
-    if (!existsSync(ymlPath) || !statSync(ymlPath).isFile()) continue
+  const seen = new Set<string>()
+  for (const root of presetRoots(profileDirectory)) {
+    for (const name of readdirSync(root)) {
+      if (name.startsWith('.') || SKIP_DIRS.has(name)) continue
+      if (seen.has(name)) continue // profile 本地优先，全局库同名不重复
+      const dir = join(root, name)
+      if (!isDir(dir)) continue
+      const ymlPath = join(dir, PRESET_YML)
+      if (!existsSync(ymlPath) || !statSync(ymlPath).isFile()) continue
 
-    let displayName = name
-    let description = ''
-    try {
-      const text = readFileSync(ymlPath, 'utf8')
-      const lines = text.split(/\r?\n/)
-      for (const line of lines) {
-        const idx = line.indexOf(':')
-        if (idx <= 0 || line.startsWith(' ') || line.startsWith('#')) continue
-        const key = line.slice(0, idx).trim()
-        const value = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '')
-        if (key === 'name' && value) displayName = value
-        else if (key === 'description' && value) description = value
-      }
-    } catch {
-      // unreadable yml — still include with defaults
+      const meta = { ...readYamlKeys(ymlPath), ...readYamlKeys(join(dir, PRESET_META)) }
+      seen.add(name)
+      out.push({
+        kind: 'preset',
+        dir: `presets/${name}`,
+        name,
+        displayName: meta.name ?? name,
+        description: meta.description ?? '',
+        path: dir,
+      })
     }
-    out.push({
-      kind: 'preset',
-      dir: `presets/${name}`,
-      name,
-      displayName,
-      description,
-      path: dir,
-    })
   }
   return out
 }

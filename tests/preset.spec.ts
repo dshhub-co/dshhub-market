@@ -75,6 +75,37 @@ describe('scanPresets / scanSkills', () => {
     expect(names).toEqual(['kbcut', 'plain'])
     expect(items.find((i) => i.name === 'kbcut')).toMatchObject({ displayName: '剪片', dir: 'skills/kbcut' })
   })
+
+  it('finds creator presets from the DSH-wide library (.agent-presets)', () => {
+    const lib = join(home, '.agent-presets', 'my-lib-mode')
+    mkdirSync(lib, { recursive: true })
+    writeFileSync(join(lib, 'agent.cordis.yml'), 'name: 库内名\n')
+    writeFileSync(join(lib, 'preset.yml'), 'name: 库模式\ndescription: 库描述\n')
+
+    const items = scanPresets(profileRoot())
+    const m = items.find((i) => i.name === 'my-lib-mode')
+    expect(m).toMatchObject({
+      kind: 'preset',
+      displayName: '库模式', // preset.yml 优先于 agent.cordis.yml 的 name
+      description: '库描述',
+      dir: 'presets/my-lib-mode',
+    })
+  })
+
+  it('dedupes by name: profile-local preset wins over the library copy', () => {
+    // 全局库同名
+    const lib = join(home, '.agent-presets', 'same-mode')
+    mkdirSync(lib, { recursive: true })
+    writeFileSync(join(lib, 'agent.cordis.yml'), 'name: 库版本\n')
+    writeFileSync(join(lib, 'preset.yml'), 'name: 库版本\ndescription: 库里的\n')
+    // profile 本地同名
+    makePreset('same-mode', 'name: 本地版本\ndescription: 本地安装的\n')
+
+    const items = scanPresets(profileRoot())
+    const matches = items.filter((i) => i.name === 'same-mode')
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatchObject({ displayName: '本地版本', description: '本地安装的' })
+  })
 })
 
 describe('installPreset', () => {

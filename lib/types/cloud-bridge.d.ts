@@ -17,8 +17,17 @@
  * platform marks a session offline after 15 min without one) → execute
  * tasks → report results. On 403 (secret invalidated) re-register.
  */
+interface BridgeState {
+    sessionId: string;
+    secret: string;
+    profile: string;
+}
+export declare function register(profile: string, version: string): Promise<BridgeState>;
+/** 单轮轮询：取任务并执行。返回 'ok'（正常结束）或 'rejected'（凭据失效，需重注册）。 */
+export declare function pollOnce(state: BridgeState): Promise<'ok' | 'rejected'>;
 /**
  * 启动云端发布通道：注册 + 无限轮询（随 DSH 进程生命周期运行）。
  * 所有失败（网络抖动 / 平台短时不可用）都静默等待下一轮，不抛错不退出。
  */
 export declare function startCloudBridge(profile: string): Promise<void>;
+export {};

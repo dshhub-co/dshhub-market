@@ -2257,7 +2257,9 @@ export function mountMarketRoutes(
                   category: 'tools',
                   description: { en: '', zh: '' },
                   install: '',
-                  kind: match.kind === 'theme' || match.kind === 'tool' || match.kind === 'skill' ? match.kind : 'plugin',
+                  // preset/skill 走目录拷贝安装（不走 pnpm），必须原样保留——
+                  // 曾把 preset 降级成 'plugin' 导致走 pnpm add 而失败
+                  kind: match.kind === 'theme' || match.kind === 'tool' || match.kind === 'skill' || match.kind === 'preset' ? match.kind : 'plugin',
                   tier: match.tier === 'appearance' || match.tier === 'agentic' ? match.tier : 'utility',
                   zip: url,
                 } as unknown as RegistryPlugin

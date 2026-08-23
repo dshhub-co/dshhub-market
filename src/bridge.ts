@@ -16,6 +16,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { loadRegistry } from './registry.ts'
+import { isBlacklisted } from './blacklist.ts'
 import { entryNeedsZip, materializeTgz } from './zip-source.ts'
 import { installTargetFor } from './sources.ts'
 import { runDshPlugin } from './dsh-cli.ts'
@@ -139,6 +140,10 @@ async function installEntry(body: Record<string, unknown>, profile: string): Pro
   if (entry.paid === true && !token) {
     return { ok: false, error: '付费插件需要 dshhub.co 登录态：请先在网站上购买，再点「一键安装」' }
   }
+  // 下架拦截（黑名单 fail-open）：网站一键安装同样拒绝已下架插件。
+  if (await isBlacklisted(entry)) {
+    return { ok: false, error: '该插件已被平台下架，无法安装' }
+  }
   // manifest v2: skill packages copy into the profile skills dir, no pnpm.
   if (entry.kind === 'skill') {
     try {
@@ -158,7 +163,9 @@ async function installEntry(body: Record<string, unknown>, profile: string): Pro
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   }
-  const target = entryNeedsZip(entry) ? await materializeTgz(entry, { token }) : installTargetFor(entry)
+  const target = entryNeedsZip(entry)
+    ? await materializeTgz(entry, { token, expectedSha256: entry.checksum })
+    : installTargetFor(entry)
   if (target === null) {
     return { ok: false, error: '不支持的来源' }
   }

@@ -227,6 +227,8 @@ const hot = vi.hoisted(() => ({
   /** Stands in for the channel line of state.json; undefined = never chosen. */
   channel: undefined as 'stable' | 'beta' | 'dev' | undefined,
   failNext: false,
+  profileKey: '',
+  bundles: [] as Array<{ id: string; name: string; items: unknown[] }>,
 }))
 vi.mock('../src/hot.ts', () => ({
   cleanHotDir: () => {},
@@ -260,6 +262,20 @@ vi.mock('../src/hot.ts', () => ({
     return Promise.resolve(index !== -1)
   },
   mountClientOnlyDeps: () => Promise.resolve([]),
+  // 口令解锁状态（install/redeem 路由用）：内存表，跨测试零污染
+  getOrCreateProfileKey: () => { if (hot.profileKey === '') hot.profileKey = 'test-profile-key'; return hot.profileKey },
+  readUnlockedState: () => ({ profileKey: hot.profileKey, bundles: hot.bundles }),
+  writeUnlockedState: (_dir: string, state: { profileKey: string; bundles: unknown[] }) => {
+    hot.profileKey = state.profileKey
+    hot.bundles = state.bundles
+  },
+  removeUnlockedRecord: (_dir: string, id: string) => {
+    const next = hot.bundles.filter((b) => b.id !== id)
+    if (next.length === hot.bundles.length) return false
+    hot.bundles = next
+    return true
+  },
+  purgeMarketState: () => {},
 }))
 
 // ---------------------------------------------------------------- fake restart scheduler
@@ -833,7 +849,7 @@ describe('update flow — no npm publishing required', () => {
   }
 
   it('flags the update and applies it', async () => {
-    advanceNpmLatest('1.2.0')
+    advanceNpmLatest('1.2.0', 30) // published 30h ago — outside the release-age gate window
     const updates = await bed.dispatch('GET', '/dsh-market/updates?force=1')
     expect(updates.json.updates['dsh-loop']).toMatchObject({ kind: 'npm', current: '1.0.0', latest: '1.2.0', updateAvailable: true })
     const r = await bed.dispatch('POST', '/dsh-market/update', { name: 'dsh-loop' })

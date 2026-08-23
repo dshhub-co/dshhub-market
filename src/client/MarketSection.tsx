@@ -34,12 +34,18 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './Market.module.css'
 import { Diagnostics } from './Diagnostics.tsx'
+import { ReportDialog } from './ReportDialog.tsx'
+import { RatingDialog } from './RatingDialog.tsx'
+// 只 import 无副作用的纯函数与类型：blacklist.ts 依赖 net.ts → undici
+// （node:assert），进浏览器 bundle 会让 DSH 宿主模块表加载失败。数据经
+// /dsh-market/blacklist 本地代理路由获取（服务端 60s TTL 缓存）。
+import { blacklistHas, dshhubIdFromZip, type BlacklistEntry } from '../blacklist-util.ts'
 import {
   avatarColor, entryForDep, groupSwitchState, humanOutput, isInstalled, looksTerminal, matchInstalledName, orderedCategories,
   formatCount, pageItems, pluginName, pluginScreenshots, readRegistryCache, readSession, themeSwatch, TIME_RANGE_DAYS, visiblePlugins, writeRegistryCache,
 } from './market-data.ts'
 import type {
-ActivationInfo, ActivationState, GistExportResult, InstalledMap, InstalledRepoHints, InstalledRepoIdentities, MarketStatus, Registry, RegistryPlugin,
+ActivationInfo, ActivationState, AppRunState, GistExportResult, InstalledMap, InstalledRepoHints, InstalledRepoIdentities, MarketStatus, Registry, RegistryPlugin,
   SharedHostPackageDependencyFinding, SortDir, SortField, ThemeSnapshot, TimeRange, Translate, UpdateStatus,
 } from './market-data.ts'
 
@@ -72,6 +78,7 @@ const KIND_BADGES: Record<string, { key: string; cls: string }> = {
   tool: { key: 'kindTool', cls: 'kindBadgeTool' },
   skill: { key: 'kindSkill', cls: 'kindBadgeSkill' },
   preset: { key: 'kindPreset', cls: 'kindBadgePreset' },
+  app: { key: 'kindApp', cls: 'kindBadgeApp' },
 }
 
 /** kind → 彩色标签（未知 kind 返回 null，调用方不渲染） */
@@ -98,6 +105,17 @@ interface UnlockedBundleItem {
   /** 摘要（平台核销时返回，本地插件才有；github 条目走 registry 兜底） */
   description?: string
   zip?: string
+  /** 直传条目的 zip 字节 SHA-256（哈希存证，安装时校验防篡改） */
+  sha256?: string
+  /** 条目已被平台下架：核销时返回但标记，卡片显示「已下架」占位 */
+  removed?: boolean
+  removedReason?: string
+  /** kind=app 部署字段（平台 import-github 上架时写入快照，核销时透传） */
+  start?: string
+  build?: string
+  port?: number
+  /** AI 安全审核摘要（含绑定 zip sha256；安装后徽章与后台核验的数据源） */
+  audit?: { level?: string; summary?: string; model?: string; audited_at?: string; sha256?: string }
 }
 
 interface UnlockedBundle {
@@ -632,6 +650,11 @@ export function MarketSection(props: MarketSectionProps) {
   const [unlockInstallOk, setUnlockInstallOk] = useState<string | null>(null)
   const [unlocked, setUnlocked] = useState<UnlockedBundle[]>([])
   const [unlockBusyUrl, setUnlockBusyUrl] = useState<string | null>(null)
+  /** kind=app 运行态：name → 状态（/dsh-market/apps/status 轮询 + 部署/停止后刷新） */
+  const [appRuns, setAppRuns] = useState<Record<string, AppRunState>>({})
+  /** 部署/停止中的应用名（按钮转「部署中…/停止中…」防连点） */
+  const [appBusy, setAppBusy] = useState<string | null>(null)
+  const [appError, setAppError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
   /** 复制微信号等联系方式：一键复制 + 短暂反馈 */
@@ -833,6 +856,16 @@ export function MarketSection(props: MarketSectionProps) {
   const [whyOpen, setWhyOpen] = useState<string | null>(null)
   /** Restore-confirm dialog (replaces window.confirm). */
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
+  /** 举报/评分对话框目标（插件端入口）：id = dshhub 插件 uuid，name = 展示名。 */
+  const [reportFor, setReportFor] = useState<{ id: string; name: string } | null>(null)
+  const [ratingFor, setRatingFor] = useState<{ id: string; name: string } | null>(null)
+  /**
+   * 平台黑名单（下架插件，60s TTL 缓存）：解锁卡「已下架」状态的实时校准。
+   * redeem 快照可能过期——插件恢复后本地记录的 removed 标记还在，卡片却
+   * 该复活；黑名单里已没有它 → 视为已恢复，正常显示安装按钮。
+   * null = 还没拉到（保持快照状态，保守显示已下架）。
+   */
+  const [blacklist, setBlacklist] = useState<BlacklistEntry[] | null>(null)
   /** Plugins that failed to install during a restore (replaces window.alert). */
   const [restoreErrors, setRestoreErrors] = useState<string[]>([])
   // How many category pills fit in the two collapsed rows (measured once —
@@ -874,6 +907,23 @@ export function MarketSection(props: MarketSectionProps) {
   // 周期性状态刷新：市场自更新替换的是磁盘上的包，运行中的进程不重启读不到
   // 自己的新版本号；状态路由已改为报「实际已安装」的版本，这里 30 秒拉一次，
   // 头部版本号在更新完成后自动跟上，不用重开设置页。
+  useEffect(() => {
+    // 黑名单校准：立即拉一次 + 60s 周期刷新（平台 CDN 缓存 60s，对齐安装
+    // 拦截的生效时延）。经本地代理 /dsh-market/blacklist（服务端缓存 TTL，
+    // 每次调用即得最新数据），浏览器不直连平台、也不引入 Node 依赖。
+    const load = () => {
+      fetch('/dsh-market/blacklist', { cache: 'no-store' })
+        .then(res => res.json())
+        .then((body: { entries?: BlacklistEntry[] }) => {
+          if (Array.isArray(body.entries)) setBlacklist(body.entries)
+        })
+        .catch(() => {})
+    }
+    load()
+    const timer = setInterval(load, 60_000)
+    return () => clearInterval(timer)
+  }, [])
+
   useEffect(() => {
     const timer = setInterval(() => {
       fetch('/dsh-market/status', { cache: 'no-store' })
@@ -1200,6 +1250,17 @@ export function MarketSection(props: MarketSectionProps) {
   }, [redeemCode, redeeming])
 
   const installUnlockedItem = useCallback((item: UnlockedBundleItem) => {
+    // 快照校准：redeem 时的 removed 标记可能过期（插件已恢复）——只有黑名单
+    // 实时命中才拦；blacklist 未拉到（null）时维持快照拦截，宁严勿松；
+    // 服务端 install 路由的 isBlacklisted 是最终防线。
+    if (item.removed === true && blacklist !== null && blacklistHas(blacklist, {
+      dshhubId: item.pluginId,
+      zip: item.zip,
+      name: item.name,
+    })) {
+      setInstallError(t('removedItemLabel'))
+      return
+    }
     const url = item.zip ?? item.url
     if (typeof url !== 'string' || url === '') return
     setInstallError(null)
@@ -1233,7 +1294,76 @@ export function MarketSection(props: MarketSectionProps) {
       })
       .catch(error => setInstallError(String(error)))
       .finally(() => setUnlockBusyUrl(null))
-  }, [refreshInstalled])
+  }, [refreshInstalled, blacklist])
+
+  // ---- kind=app 部署 / 停止 / 打开（零门槛：无弹窗无确认；审核在上架时已完成） ----
+
+  /** 拉取全部已安装应用的运行状态（部署/停止后 + 10s 轮询保活）。 */
+  const refreshAppRuns = useCallback(() => {
+    fetch('/dsh-market/apps/status', { cache: 'no-store' })
+      .then(res => res.json())
+      .then((body: { apps?: Record<string, AppRunState> }) => {
+        if (body.apps && typeof body.apps === 'object') setAppRuns(body.apps)
+      })
+      .catch(() => {})
+  }, [])
+
+  const deployAppItem = useCallback((item: UnlockedBundleItem) => {
+    const name = typeof item.name === 'string' ? item.name : ''
+    if (name === '') return
+    setAppError(null)
+    setAppBusy(name)
+    fetch('/dsh-market/apps/deploy', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+      .then(res => res.json().then(body => ({ status: res.status, body })))
+      .then(({ status, body }) => {
+        if (status === 200 && body.ok) {
+          setAppRuns(prev => ({
+            ...prev,
+            [name]: { running: true, pid: body.pid, port: body.port, url: body.url, startedAt: body.startedAt },
+          }))
+          // 部署后浏览器新标签打开（用户手势内 window.open，不受弹窗拦截）
+          if (typeof body.url === 'string' && body.url !== '') window.open(body.url, '_blank', 'noopener')
+        } else {
+          setAppError(typeof body.error === 'string' ? body.error : `HTTP ${String(status)}`)
+        }
+      })
+      .catch(error => setAppError(String(error)))
+      .finally(() => setAppBusy(null))
+  }, [])
+
+  const stopAppItem = useCallback((item: UnlockedBundleItem) => {
+    const name = typeof item.name === 'string' ? item.name : ''
+    if (name === '') return
+    setAppError(null)
+    setAppBusy(name)
+    fetch('/dsh-market/apps/stop', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+      .then(res => res.json().then(body => ({ status: res.status, body })))
+      .then(({ status, body }) => {
+        if (status === 200 && body.ok) {
+          setAppRuns(prev => ({ ...prev, [name]: { running: false } }))
+        } else {
+          setAppError(typeof body.error === 'string' ? body.error : `HTTP ${String(status)}`)
+        }
+      })
+      .catch(error => setAppError(String(error)))
+      .finally(() => setAppBusy(null))
+  }, [])
+
+  // kind=app 运行态保活：应用是独立本地进程，宿主重启/应用崩溃后本地状态会变，
+  // 10s 轮询把卡片上的「运行中·端口」与真实进程对齐（应用自己退出会自动清理）。
+  useEffect(() => {
+    refreshAppRuns()
+    const timer = setInterval(refreshAppRuns, 10_000)
+    return () => clearInterval(timer)
+  }, [refreshAppRuns])
 
   /** 删除一条口令解锁记录：只动 unlocked.json，已安装的插件不受影响。 */
   const doRemoveUnlock = useCallback(async () => {
@@ -2532,8 +2662,22 @@ export function MarketSection(props: MarketSectionProps) {
                             : (typeof item.url === 'string' && item.url !== '') ? item.url : null
                           // 类型标签（theme/plugin/tool/skill/preset，彩色）；旧记录无 kind 时不显示
                           const badge = typeof item.kind === 'string' ? kindBadge(item.kind) : null
+                          // 「已下架」状态实时校准：redeem 快照可能过期——插件恢复后本地
+                          // removed 标记还在。黑名单缓存（60s TTL）里已没有它 → 视为已
+                          // 恢复，正常显示安装；命中时原因用黑名单实时值。
+                          // blacklist 为 null（还没拉到）→ 维持快照，保守显示已下架。
+                          const removedNow = item.removed === true && blacklist !== null && blacklistHas(blacklist, {
+                            dshhubId: item.pluginId,
+                            zip: item.zip,
+                            name: item.name,
+                          })
+                          const removedHit = item.removed === true && blacklist !== null
+                            ? blacklist.find(b =>
+                                b.id === item.pluginId || (item.zip !== undefined && b.id === dshhubIdFromZip(item.zip)))
+                            : undefined
+                          const removedReason = removedHit?.reason ?? item.removedReason
                           return (
-                            <div key={i} className={css.unlockedItem}>
+                            <div key={i} className={`${css.unlockedItem}${removedNow ? ` ${css.removedItem}` : ''}`}>
                               <div style={{ minWidth: 0, flex: 1 }}>
                                 <div className={css.unlockedItemLine}>
                                   {itemHref !== null
@@ -2556,21 +2700,92 @@ export function MarketSection(props: MarketSectionProps) {
                                   {badge !== null && (
                                     <span className={`${css.kindBadge} ${css[badge.cls]}`}>{t(badge.key)}</span>
                                   )}
+                                  {/* AI 审核徽章（kind=app 平台审核后才上架；pass 绿 / warn 黄，
+                                      hover 看审核结论；deny 的条目根本不会出现） */}
+                                  {(item.audit?.level === 'pass' || item.audit?.level === 'warn') && (
+                                    <span
+                                      className={`${css.kindBadge} ${css[item.audit.level === 'warn' ? 'auditBadgeWarn' : 'auditBadgePass']}`}
+                                      title={item.audit.summary}
+                                    >
+                                      {item.audit.level === 'warn' ? t('auditBadgeWarn') : t('auditBadgePass')}
+                                    </span>
+                                  )}
                                 </div>
-                                {itemDesc !== '' && (
-                                  <span className={css.unlockedItemDesc}>{itemDesc}</span>
+                                {removedNow ? (
+                                  typeof removedReason === 'string' && removedReason !== '' ? (
+                                    <span className={css.removedItemReason}>
+                                      {t('removedItemReason').replace('{0}', removedReason)}
+                                    </span>
+                                  ) : null
+                                ) : (
+                                  itemDesc !== '' && (
+                                    <span className={css.unlockedItemDesc}>{itemDesc}</span>
+                                  )
                                 )}
                               </div>
-                              {installedMatch ? (
-                                <span className={css.unlockedInstalled}>{t('installedLabel')}</span>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={unlockBusyUrl === installUrl || installUrl === ''}
-                                  onClick={() => installUnlockedItem(item)}
-                                >{unlockBusyUrl === installUrl ? t('installing') : t('unlockInstall')}</Button>
-                              )}
+                              <div className={css.unlockedActions}>
+                                {removedNow ? (
+                                  <span className={css.removedBadge}>{t('removedItemLabel')}</span>
+                                ) : installedMatch && item.kind === 'app' ? (
+                                  // kind=app：已安装 → 部署/停止/打开（应用是独立本地进程，
+                                  // 运行态由 apps/status 轮询驱动；部署成功后浏览器新标签打开）
+                                  appRuns[item.name ?? '']?.running === true ? (
+                                    <>
+                                      <span className={css.appRunning}>
+                                        <span className={css.appRunningDot} />
+                                        {t('appRunning').replace('{0}', String(appRuns[item.name ?? '']?.port ?? ''))}
+                                      </span>
+                                      <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => {
+                                          const url = appRuns[item.name ?? '']?.url
+                                          if (typeof url === 'string' && url !== '') window.open(url, '_blank', 'noopener')
+                                        }}
+                                      >{t('appOpen')}</Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={appBusy === item.name}
+                                        onClick={() => stopAppItem(item)}
+                                      >{appBusy === item.name ? t('appStopping') : t('appStop')}</Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={appBusy === item.name}
+                                        onClick={() => deployAppItem(item)}
+                                      >{appBusy === item.name ? t('appDeploying') : t('appDeploy')}</Button>
+                                      {appError !== null && (
+                                        <span className={css.appError}>{appError}</span>
+                                      )}
+                                    </>
+                                  )
+                                ) : installedMatch ? (
+                                  <span className={css.unlockedInstalled}>{t('installedLabel')}</span>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={unlockBusyUrl === installUrl || installUrl === ''}
+                                    onClick={() => installUnlockedItem(item)}
+                                  >{unlockBusyUrl === installUrl ? t('installing') : t('unlockInstall')}</Button>
+                                )}
+                                {removedNow !== true && typeof item.pluginId === 'string' && item.pluginId !== '' && (
+                                  <>
+                                    <span
+                                      className={css.actLink}
+                                      onClick={() => setRatingFor({ id: item.pluginId as string, name: item.name ?? '' })}
+                                    >{t('rateLink')}</span>
+                                    <span
+                                      className={css.actLink}
+                                      onClick={() => setReportFor({ id: item.pluginId as string, name: item.name ?? '' })}
+                                    >{t('reportLink')}</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           )
                         })}
@@ -3242,6 +3457,18 @@ export function MarketSection(props: MarketSectionProps) {
                                       </button>
                                     ))}
                                 {repoUrl !== null && <a className={css.src} href={repoUrl + '#readme'} target="_blank" rel="noreferrer">{t('readme')}</a>}
+                                {entry !== undefined && entry.dshhubId !== undefined && entry.dshhubId !== '' && (
+                                  <>
+                                    <span
+                                      className={css.actLink}
+                                      onClick={() => setRatingFor({ id: entry.dshhubId as string, name })}
+                                    >{t('rateLink')}</span>
+                                    <span
+                                      className={css.actLink}
+                                      onClick={() => setReportFor({ id: entry.dshhubId as string, name })}
+                                    >{t('reportLink')}</span>
+                                  </>
+                                )}
                                 {entry !== undefined && entry.deprecated === true && entry.replacement !== undefined && (() => {
                                   const replacement = data?.plugins.find(r => r.name === entry.replacement)
                                   if (replacement === undefined) return null
@@ -3458,6 +3685,24 @@ export function MarketSection(props: MarketSectionProps) {
       )}
       {exportState === 'fail' && (
         <Toast text={t('exportLogFail')} icon={<IconWarningOutline16 size={14} />} onDone={exportToastDone} />
+      )}
+      {reportFor !== null && (
+        <ReportDialog
+          pluginId={reportFor.id}
+          name={reportFor.name}
+          open
+          onClose={() => setReportFor(null)}
+          t={t}
+        />
+      )}
+      {ratingFor !== null && (
+        <RatingDialog
+          pluginId={ratingFor.id}
+          name={ratingFor.name}
+          open
+          onClose={() => setRatingFor(null)}
+          t={t}
+        />
       )}
     </div>
   )

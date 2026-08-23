@@ -856,11 +856,14 @@ export function mountMarketRoutes(
             return
           }
           const profileKey = getOrCreateProfileKey(activeProfileDir)
+          // 上游 120 秒：国内直连 dshhub.co 的网络波动 + Vercel 冷启动叠加时
+          // 25 秒经常不够（用户报告过 "The operation was aborted due to timeout"）。
+          // 与 zip 下载（installPreset/installSkill 180 秒）同量级，宁可多等不能误杀。
           const upstream = await fetch(`${DSHHUB_API}/api/passcodes/redeem`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ code, profileKey }),
-            signal: AbortSignal.timeout(25_000),
+            signal: AbortSignal.timeout(120_000),
           })
           const upstreamBody = (await upstream.json().catch(() => ({}))) as {
             ok?: boolean
@@ -929,7 +932,14 @@ export function mountMarketRoutes(
           sendJson(response, 200, { ok: true, bundle: record })
         } catch (error) {
           logEvent('error', 'redeem', `redeem failed: ${error instanceof Error ? error.message : String(error)}`)
-          sendJson(response, 502, { error: error instanceof Error ? error.message : String(error) })
+          // 超时类错误给友好文案（否则浏览器会把 DOMException 原文抛给用户，
+          // 例如 "The operation was aborted due to timeout"）。
+          const message = error instanceof Error ? error.message : String(error)
+          if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError' || /timeout/i.test(message))) {
+            sendJson(response, 504, { error: '解锁请求超时，请稍后重试 / unlock request timed out, please retry in a moment' })
+            return
+          }
+          sendJson(response, 502, { error: message })
         }
       },
     }),

@@ -104,6 +104,11 @@ export interface UnlockedState {
 export declare function readUnlockedState(profileDir: string): UnlockedState;
 export declare function writeUnlockedState(profileDir: string, state: UnlockedState): void;
 /**
+ * 删除一条口令解锁记录（买家侧）：只移走卡片，已安装的插件不受影响。
+ * 找不到该记录时返回 false 且不写盘（幂等）。
+ */
+export declare function removeUnlockedRecord(profileDir: string, id: string): boolean;
+/**
  * 无感绑定：每个 profile 一次性生成的口令身份。
  * 不注册、不填手机号、不绑机器码——买家只输码，这个 key 全程自动。
  * 存于 profile 目录，重装市场 / 重启 DSH 不变。

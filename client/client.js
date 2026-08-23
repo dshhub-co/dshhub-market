@@ -84,6 +84,10 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			unlockedEmpty: "还没解锁过插件。看到博主视频里的口令了吗？输进来试试。",
 			unlockedAt: "解锁于 {0}",
 			unlockInstall: "安装",
+			unlockDelete: "删除",
+			unlockDeleteWorking: "删除中…",
+			unlockDeleteConfirm: "删除这条解锁记录？已安装的插件不受影响。",
+			unlockDeleteFail: "删除失败",
 			installedLabel: "已安装",
 			unlockInstallOk: "安装成功：{0}，可在「已安装」里看到它",
 			teachingLabel: "使用指南",
@@ -433,6 +437,10 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			unlockedEmpty: "Nothing unlocked yet. Seen a passcode in a creator’s video? Type it in.",
 			unlockedAt: "Unlocked {0}",
 			unlockInstall: "Install",
+			unlockDelete: "Remove",
+			unlockDeleteWorking: "Removing…",
+			unlockDeleteConfirm: "Remove this unlock record? Installed plugins are not affected.",
+			unlockDeleteFail: "Remove failed",
 			installedLabel: "Installed",
 			unlockInstallOk: "Installed: {0} — find it in the Installed tab",
 			teachingLabel: "Guides",
@@ -3153,6 +3161,10 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			const [removeConfirm, setRemoveConfirm] = (0, react.useState)(null);
 			const [removingName, setRemovingName] = (0, react.useState)(null);
 			const [removedCount, setRemovedCount] = (0, react.useState)(0);
+			/** 口令解锁记录删除确认（记录 id）——只删记录，不影响已安装。 */
+			const [unlockDeleteId, setUnlockDeleteId] = (0, react.useState)(null);
+			const [unlockDeleting, setUnlockDeleting] = (0, react.useState)(false);
+			const [unlockDeleteFail, setUnlockDeleteFail] = (0, react.useState)(null);
 			/** Toggles whose live fiber did not follow the switch — restart to apply. */
 			const [toggleRestart, setToggleRestart] = (0, react.useState)(0);
 			/**
@@ -3561,6 +3573,27 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 					else setInstallError(typeof body.error === "string" ? body.error : `HTTP ${String(status)}`);
 				}).catch((error) => setInstallError(String(error))).finally(() => setUnlockBusyUrl(null));
 			}, [refreshInstalled]);
+			/** 删除一条口令解锁记录：只动 unlocked.json，已安装的插件不受影响。 */
+			const doRemoveUnlock = (0, react.useCallback)(async () => {
+				if (unlockDeleteId === null) return;
+				setUnlockDeleting(true);
+				setUnlockDeleteFail(null);
+				try {
+					const res = await fetch("/dsh-market/unlocked/remove", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({ id: unlockDeleteId })
+					});
+					const body = await res.json().catch(() => ({}));
+					if (!res.ok || body.ok !== true) throw new Error(body.error ?? `HTTP ${res.status}`);
+					if (Array.isArray(body.bundles)) setUnlocked(body.bundles);
+					setUnlockDeleteId(null);
+				} catch (e) {
+					setUnlockDeleteFail(e instanceof Error ? e.message : String(e));
+				} finally {
+					setUnlockDeleting(false);
+				}
+			}, [unlockDeleteId]);
 			const compatibilitySummary = (risks) => {
 				if (risks.length === 0) return "";
 				const first = risks[0];
@@ -5063,13 +5096,25 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 										children: [
 											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 												className: Market_module_css_default.unlockedHead,
-												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", {
-													className: Market_module_css_default.unlockedName,
-													children: bundle.name
-												}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													className: Market_module_css_default.unlockedAt,
-													children: t("unlockedAt").replace("{0}", new Date(bundle.redeemedAt).toLocaleDateString())
-												})]
+												children: [
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", {
+														className: Market_module_css_default.unlockedName,
+														children: bundle.name
+													}),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+														className: Market_module_css_default.unlockedAt,
+														children: t("unlockedAt").replace("{0}", new Date(bundle.redeemedAt).toLocaleDateString())
+													}),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "ghost",
+														size: "sm",
+														onClick: () => {
+															setUnlockDeleteFail(null);
+															setUnlockDeleteId(bundle.id);
+														},
+														children: t("unlockDelete")
+													})
+												]
 											}),
 											(bundle.creatorName ?? "") !== "" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 												className: Market_module_css_default.unlockedBy,
@@ -6347,6 +6392,25 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 							onClick: () => doUninstall(removeConfirm),
 							children: t("uninstall")
 						})] })
+					}),
+					unlockDeleteId !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+						open: true,
+						onClose: () => setUnlockDeleteId(null),
+						title: t("unlockDeleteConfirm"),
+						footer: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							variant: "ghost",
+							onClick: () => setUnlockDeleteId(null),
+							children: t("cancel")
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							variant: "primary",
+							disabled: unlockDeleting,
+							onClick: () => void doRemoveUnlock(),
+							children: unlockDeleting ? t("unlockDeleteWorking") : t("unlockDelete")
+						})] }),
+						children: unlockDeleteFail !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: Market_module_css_default.modalNote,
+							children: t("unlockDeleteFail") + "：" + unlockDeleteFail
+						})
 					}),
 					restoreConfirmOpen && pendingBackup !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
 						open: true,

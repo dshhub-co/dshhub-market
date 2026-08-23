@@ -76,6 +76,8 @@ export interface UnlockedBundleItem {
     name?: string;
     kind?: string;
     tier?: string;
+    /** 摘要（平台核销时返回，本地插件才有；github 条目走 registry 兜底） */
+    description?: string;
     zip?: string;
 }
 export interface UnlockedBundleRecord {

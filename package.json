@@ -1,7 +1,7 @@
 {
   "name": "dshhub-market",
   "description": "DeepSeek Harness 口令插件市场客户端：输码解锁插件，连接创作者与买家（DSHHub.co 驱动，fork of dsh-market）。",
-  "version": "0.8.18",
+  "version": "0.8.19",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

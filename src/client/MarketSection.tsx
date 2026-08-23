@@ -65,6 +65,15 @@ const TIER_EMOJI: Record<string, string> = {
   agentic: '🤖',
 }
 
+/** kind → 解锁卡条目类型标签键（与网页端五类一致；未知 kind 不显示） */
+const KIND_LABEL_KEYS: Record<string, string> = {
+  theme: 'kindTheme',
+  plugin: 'kindPlugin',
+  tool: 'kindTool',
+  skill: 'kindSkill',
+  preset: 'kindPreset',
+}
+
 /** 顶层三档标签卡的顺序与本地化键 */
 const TIER_TAB_IDS = ['appearance', 'utility', 'agentic'] as const
 const TIER_TAB_KEYS: Record<string, string> = {
@@ -81,6 +90,8 @@ interface UnlockedBundleItem {
   name?: string
   kind?: string
   tier?: string
+  /** 摘要（平台核销时返回，本地插件才有；github 条目走 registry 兜底） */
+  description?: string
   zip?: string
 }
 
@@ -2500,17 +2511,26 @@ export function MarketSection(props: MarketSectionProps) {
                         {bundle.items.map((item, i) => {
                           const installUrl = item.zip ?? item.url ?? ''
                           const installedMatch = typeof item.name === 'string' && installed[item.name] !== undefined
-                          // 每个插件的默认描述/摘要（registry 双语字段，跟随界面语言）
+                          // 摘要：平台核销时随条目返回的 description（本地插件）优先，
+                          // 缺了再走 registry 双语字段（github 条目 / 演示码，跟随界面语言）
                           const rp = typeof item.url === 'string' ? (data?.plugins ?? []).find(p => p.url === item.url) : undefined
-                          const itemDesc = rp?.description
+                          const rpDesc = rp?.description
                             ? ((rp.description[lang] ?? rp.description.en) || '')
                             : ''
+                          const itemDesc = item.description || rpDesc
+                          // 类型标签（theme/plugin/tool/skill/preset）；旧记录无 kind 时不显示
+                          const kindKey = typeof item.kind === 'string' ? KIND_LABEL_KEYS[item.kind] : undefined
                           return (
                             <div key={i} className={css.unlockedItem}>
                               <div style={{ minWidth: 0, flex: 1 }}>
-                                <span className={css.unlockedItemName}>
-                                  {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
-                                </span>
+                                <div className={css.unlockedItemLine}>
+                                  <span className={css.unlockedItemName}>
+                                    {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
+                                  </span>
+                                  {kindKey !== undefined && (
+                                    <span className={css.unlockedItemKind}>{t(kindKey)}</span>
+                                  )}
+                                </div>
                                 {itemDesc !== '' && (
                                   <span className={css.unlockedItemDesc}>{itemDesc}</span>
                                 )}

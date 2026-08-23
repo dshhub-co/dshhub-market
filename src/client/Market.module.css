@@ -330,7 +330,9 @@
 .unlockedAuthors{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary,#8b93a1)}
 .unlockedLabel{font-weight:600;color:var(--dsw-alias-label-secondary,#6b7280);margin-right:6px}
 .unlockedItem{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);padding-top:8px}
-.unlockedItemName{font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlockedItemLine{display:flex;align-items:center;gap:8px;min-width:0}
+.unlockedItemName{flex:1;min-width:0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlockedItemKind{flex-shrink:0;font-size:11px;line-height:16px;color:var(--dsw-alias-brand-primary,#4f7cff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:999px;padding:1px 8px;white-space:nowrap}
 .unlockedItemDesc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280);margin-left:24px;display:block}
 .unlockedInstalled{font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,#16a34a)}
 

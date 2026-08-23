@@ -95,6 +95,36 @@ describe('scanPresets / scanSkills', () => {
     expect(items.find((i) => i.name === 'kbcut')).toMatchObject({ displayName: '剪片', dir: 'skills/kbcut' })
   })
 
+  it('finds skills in the DSH user-level root <dsh-home>/skills (official convention)', () => {
+    const dir = join(home, 'skills', 'koubo-cover')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'SKILL.md'), '---\nname: koubo-cover\ndescription: 为口播视频生成竖版封面图\n---\n正文')
+
+    const items = scanSkills(profileRoot())
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      kind: 'skill',
+      name: 'koubo-cover',
+      displayName: 'koubo-cover',
+      description: '为口播视频生成竖版封面图',
+      dir: 'skills/koubo-cover',
+    })
+  })
+
+  it('dedupes skills by name: the user-level root wins over the profile root', () => {
+    // 官方用户级根同名
+    const userDir = join(home, 'skills', 'same-skill')
+    mkdirSync(userDir, { recursive: true })
+    writeFileSync(join(userDir, 'SKILL.md'), '---\nname: 用户版\ndescription: 用户根里的\n---\n')
+    // profile 根同名（市场安装位）
+    makeSkill('same-skill', '---\nname: 安装版\ndescription: 装到 profile 的\n---\n')
+
+    const items = scanSkills(profileRoot())
+    const matches = items.filter((i) => i.name === 'same-skill')
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatchObject({ displayName: '用户版', description: '用户根里的' })
+  })
+
   it('reads preset.yml metadata in preference to agent.cordis.yml', () => {
     makePreset('my-lib-mode', 'name: 库内名\n')
     writeFileSync(join(userPresetRoot(), 'my-lib-mode', 'preset.yml'), 'name: 库模式\ndescription: 库描述\n')

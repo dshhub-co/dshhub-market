@@ -7,12 +7,14 @@
  *     DSH never read — migrateLegacyPresets() moved those over. The legacy
  *     profile root is still scanned below for profiles that predate the
  *     migration, then dropped once it is gone.
- *   - skills: SKILL.md under <profile>/skills/
+ *   - skills: SKILL.md under <dsh-home>/skills (DSH's user-level skill root,
+ *     the official home for personal skills — visible to any session) plus
+ *     <profile>/skills/ (the market's kind=skill install location).
  */
 
 import { join } from 'node:path'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { presetsRoot } from './preset-install.ts'
+import { dshHome, presetsRoot } from './preset-install.ts'
 
 export interface ScannedItem {
   kind: 'preset' | 'skill'
@@ -105,56 +107,75 @@ export function scanPresets(profileDirectory: string): ScannedItem[] {
 }
 
 /**
- * Scan <profile>/skills/ for skill directories (containing SKILL.md).
+ * DSH skill roots that can yield publishable skills:
+ *   - <dsh-home>/skills — DSH's user-level skill root (user-dsh source, rank
+ *     400): the official home for personal skills, visible to any session.
+ *     User-authored skills (e.g. koubo-cover) live here.
+ *   - <profile>/skills/ — the market's install location for kind=skill
+ *     packages (manifest v2 §5 copies each skill dir here).
+ * The user root is scanned first, so a same-name skill in the profile root
+ * never shadows the official one.
+ */
+function skillRoots(profileDirectory: string): string[] {
+  const roots = [join(dshHome(), 'skills')]
+  roots.push(join(profileDirectory, 'skills'))
+  return roots.filter(existsSync)
+}
+
+/**
+ * Scan both skill roots for skill directories (containing SKILL.md).
  * Each directory with a valid frontmatter name is a candidate.
  */
 export function scanSkills(profileDirectory: string): ScannedItem[] {
-  const root = join(profileDirectory, 'skills')
-  if (!existsSync(root)) return []
   const out: ScannedItem[] = []
-  for (const name of readdirSync(root)) {
-    if (name.startsWith('.') || SKIP_DIRS.has(name)) continue
-    const dir = join(root, name)
-    if (!isDir(dir)) continue
-    const mdPath = join(dir, SKILL_MD)
-    if (!existsSync(mdPath) || !statSync(mdPath).isFile()) continue
+  const seen = new Set<string>()
+  for (const root of skillRoots(profileDirectory)) {
+    for (const name of readdirSync(root)) {
+      if (name.startsWith('.') || SKIP_DIRS.has(name)) continue
+      if (seen.has(name)) continue // 用户级根优先，profile 根同名不重复
+      const dir = join(root, name)
+      if (!isDir(dir)) continue
+      const mdPath = join(dir, SKILL_MD)
+      if (!existsSync(mdPath) || !statSync(mdPath).isFile()) continue
+      seen.add(name)
 
-    let displayName = name
-    let description = ''
-    try {
-      const text = readFileSync(mdPath, 'utf8')
-      let inFront = false
-      let started = false
-      for (const line of text.split(/\r?\n/)) {
-        if (!started) {
-          if (line.trim() === '---') {
-            started = true
-            inFront = true
+      let displayName = name
+      let description = ''
+      try {
+        const text = readFileSync(mdPath, 'utf8')
+        let inFront = false
+        let started = false
+        for (const line of text.split(/\r?\n/)) {
+          if (!started) {
+            if (line.trim() === '---') {
+              started = true
+              inFront = true
+            }
+            continue
           }
-          continue
-        }
-        if (inFront) {
-          if (line.trim() === '---') break
-          const idx = line.indexOf(':')
-          if (idx > 0) {
-            const key = line.slice(0, idx).trim()
-            const value = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '')
-            if (key === 'name' && value) displayName = value
-            else if (key === 'description' && value) description = value
+          if (inFront) {
+            if (line.trim() === '---') break
+            const idx = line.indexOf(':')
+            if (idx > 0) {
+              const key = line.slice(0, idx).trim()
+              const value = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '')
+              if (key === 'name' && value) displayName = value
+              else if (key === 'description' && value) description = value
+            }
           }
         }
+      } catch {
+        // unreadable md — still include with defaults
       }
-    } catch {
-      // unreadable md — still include with defaults
+      out.push({
+        kind: 'skill',
+        dir: `skills/${name}`,
+        name,
+        displayName,
+        description,
+        path: dir,
+      })
     }
-    out.push({
-      kind: 'skill',
-      dir: `skills/${name}`,
-      name,
-      displayName,
-      description,
-      path: dir,
-    })
   }
   return out
 }

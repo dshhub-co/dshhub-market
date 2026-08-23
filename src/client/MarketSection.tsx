@@ -65,13 +65,18 @@ const TIER_EMOJI: Record<string, string> = {
   agentic: '🤖',
 }
 
-/** kind → 解锁卡条目类型标签键（与网页端五类一致；未知 kind 不显示） */
-const KIND_LABEL_KEYS: Record<string, string> = {
-  theme: 'kindTheme',
-  plugin: 'kindPlugin',
-  tool: 'kindTool',
-  skill: 'kindSkill',
-  preset: 'kindPreset',
+/** kind → 彩色标签（文案键 + 颜色类；与网页端五类一致；未知 kind 不显示） */
+const KIND_BADGES: Record<string, { key: string; cls: string }> = {
+  theme: { key: 'kindTheme', cls: 'kindBadgeTheme' },
+  plugin: { key: 'kindPlugin', cls: 'kindBadgePlugin' },
+  tool: { key: 'kindTool', cls: 'kindBadgeTool' },
+  skill: { key: 'kindSkill', cls: 'kindBadgeSkill' },
+  preset: { key: 'kindPreset', cls: 'kindBadgePreset' },
+}
+
+/** kind → 彩色标签（未知 kind 返回 null，调用方不渲染） */
+function kindBadge(kind: string): { key: string; cls: string } | null {
+  return KIND_BADGES[kind] ?? null
 }
 
 /** 顶层三档标签卡的顺序与本地化键 */
@@ -596,6 +601,8 @@ export function MarketSection(props: MarketSectionProps) {
   const [data, setData] = useState<Registry | null>(cachedRegistry ?? readRegistryCache())
   const [loadError, setLoadError] = useState<string | null>(null)
   const [installed, setInstalledState] = useState<InstalledMap>(cachedInstalled ?? {})
+  /** 已安装插件的类型标签（/dsh-market/installed → kinds，本地 manifest 读取） */
+  const [installedKinds, setInstalledKinds] = useState<Record<string, string>>({})
   const setInstalled = useCallback((value: InstalledMap) => { cachedInstalled = value; setInstalledState(value) }, [])
   const [repoIdentities, setRepoIdentitiesState] = useState<InstalledRepoIdentities>(cachedRepoIdentities ?? {})
   const setRepoIdentities = useCallback((value: InstalledRepoIdentities) => {
@@ -842,6 +849,7 @@ export function MarketSection(props: MarketSectionProps) {
         setRepoIdentities(installedRepoIdentities(body.repoIdentities))
         setRepoHints(installedRepoHints(body.repoHints))
         setInstalledFiles(Array.isArray(body.present) ? body.present : Object.keys(body.installed || {}))
+        if (body.kinds && typeof body.kinds === 'object') setInstalledKinds(body.kinds as Record<string, string>)
         setSkins(body.live || [])
         if (Array.isArray(body.disabled)) setDisabledNames(body.disabled)
         if (Array.isArray(body.patchDisabled)) setPatchDisabledNames(body.patchDisabled)
@@ -2518,17 +2526,35 @@ export function MarketSection(props: MarketSectionProps) {
                             ? ((rp.description[lang] ?? rp.description.en) || '')
                             : ''
                           const itemDesc = item.description || rpDesc
-                          // 类型标签（theme/plugin/tool/skill/preset）；旧记录无 kind 时不显示
-                          const kindKey = typeof item.kind === 'string' ? KIND_LABEL_KEYS[item.kind] : undefined
+                          // 条目链接：本地插件链到 dshhub.co 详情页；github 条目链到仓库
+                          const itemHref = (typeof item.pluginId === 'string' && item.pluginId !== '')
+                            ? `https://www.dshhub.co/plugin/${item.pluginId}`
+                            : (typeof item.url === 'string' && item.url !== '') ? item.url : null
+                          // 类型标签（theme/plugin/tool/skill/preset，彩色）；旧记录无 kind 时不显示
+                          const badge = typeof item.kind === 'string' ? kindBadge(item.kind) : null
                           return (
                             <div key={i} className={css.unlockedItem}>
                               <div style={{ minWidth: 0, flex: 1 }}>
                                 <div className={css.unlockedItemLine}>
-                                  <span className={css.unlockedItemName}>
-                                    {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
-                                  </span>
-                                  {kindKey !== undefined && (
-                                    <span className={css.unlockedItemKind}>{t(kindKey)}</span>
+                                  {itemHref !== null
+                                    ? (
+                                        <a
+                                          className={`${css.unlockedItemName} ${css.unlockedItemLink}`}
+                                          href={itemHref}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          title={itemHref}
+                                        >
+                                          {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
+                                        </a>
+                                      )
+                                    : (
+                                        <span className={css.unlockedItemName}>
+                                          {item.type === 'github' ? '🐙 ' : '📦 '}{item.name ?? item.url ?? ''}
+                                        </span>
+                                      )}
+                                  {badge !== null && (
+                                    <span className={`${css.kindBadge} ${css[badge.cls]}`}>{t(badge.key)}</span>
                                   )}
                                 </div>
                                 {itemDesc !== '' && (
@@ -2985,9 +3011,12 @@ export function MarketSection(props: MarketSectionProps) {
                                       })()}
                                       <div className={css.groupMembers}>
                                         {members.length === 0 && <div className={css.groupHint}>{t('groupEmpty')}</div>}
-                                        {members.map(member => (
+                                        {members.map(member => {
+                                          const mbadge = kindBadge(typeof installedKinds[member] === 'string' ? installedKinds[member] : '')
+                                          return (
                                           <div className={css.groupMember} key={member}>
                                             <span className={css.nm}>{member}</span>
+                                            {mbadge !== null && <span className={`${css.kindBadge} ${css[mbadge.cls]}`}>{t(mbadge.key)}</span>}
                                             {effectiveDisabledSet.has(member) && <span className={css.spec}>{t('disabledState')}</span>}
                                             {patchDisabledNames.includes(member) && <span className={css.spec}>{' · ' + t('patchDisabled')}</span>}
                                             <span className={css.grow} />
@@ -3004,7 +3033,8 @@ export function MarketSection(props: MarketSectionProps) {
                                             </button>
                                             <Button variant="ghost" size="sm" onClick={() => doRemoveMember(gid, member)}>{t('groupRemove')}</Button>
                                           </div>
-                                        ))}
+                                          )
+                                        })}
                                       </div>
                                     </div>
                                   )
@@ -3014,12 +3044,16 @@ export function MarketSection(props: MarketSectionProps) {
                               ? <div className={css.empty}>{t('installedEmpty')}</div>
                               : ungroupedNames.map(name => {
                                   const entry = data === null ? undefined : entryForDep(data.plugins, name, String(installed[name]), repoIdentities[name], repoHints[name])
+                                  const badge = typeof installedKinds[name] === 'string'
+                                    ? kindBadge(installedKinds[name])
+                                    : entry !== undefined ? kindBadge(entry.kind ?? '') : null
                                   const off = effectiveDisabledSet.has(name)
                                   return (
                                     <div className={css.irow} key={'ug-' + name}>
                                       <div style={{ minWidth: 0 }}>
                                         <div className={css.nm}>
                                           {name}
+                                          {badge !== null && <span className={`${css.kindBadge} ${css[badge.cls]}`}>{t(badge.key)}</span>}
                                           {entry?.deprecated === true && <span className={css.depBadge}>{t('deprecatedBadge')}</span>}
                                           {patchDisabledNames.includes(name) && <span className={css.depBadge}>{t('patchDisabled')}</span>}
                                         </div>
@@ -3066,6 +3100,10 @@ export function MarketSection(props: MarketSectionProps) {
                             .map(([name, spec]) => {
                             const missing = pendingBackup !== null && !installedFiles.includes(name)
                             const entry = data === null ? undefined : entryForDep(data.plugins, name, String(spec), repoIdentities[name], repoHints[name])
+                            // 类型标签：本地 manifest（/installed → kinds）优先，registry 条目兜底
+                            const badge = typeof installedKinds[name] === 'string'
+                              ? kindBadge(installedKinds[name])
+                              : entry !== undefined ? kindBadge(entry.kind ?? '') : null
                             const status = updates[name]
                             const act = activations[name]
                             const meta = act !== undefined ? activationMeta(act.state, t) : null
@@ -3084,6 +3122,7 @@ export function MarketSection(props: MarketSectionProps) {
                                 <div style={{ minWidth: 0 }}>
                                   <div className={css.nm}>
                                     {name}
+                                    {badge !== null && <span className={`${css.kindBadge} ${css[badge.cls]}`}>{t(badge.key)}</span>}
                                     {entry?.deprecated === true && <span className={css.depBadge}>{t('deprecatedBadge')}</span>}
                                     {patchDisabledNames.includes(name) && <span className={css.depBadge}>{t('patchDisabled')}</span>}
                                     {!effectiveDisabledSet.has(name) && patchForcedNames.includes(name) && <span className={css.depBadge}>{t('patchForced')}</span>}

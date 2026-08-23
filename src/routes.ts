@@ -1044,6 +1044,18 @@ export function mountMarketRoutes(
           packageName,
           manifest: readInstalledManifest(config.profile, packageName, activeProfileDir),
         })))
+        // 已安装插件的类型标签（manifest v2 kind）：skill:/preset: 目录包按
+        // 前缀直接判定，其余读本地已安装 manifest —— 客户端「已安装」页用
+        // 彩色标签区分皮肤/插件/工具/技能/Agent 模式。
+        const kinds: Record<string, string> = {}
+        for (const [name, spec] of Object.entries(installed)) {
+          if (spec.startsWith('skill:')) kinds[name] = 'skill'
+          else if (spec.startsWith('preset:')) kinds[name] = 'preset'
+          else {
+            const m = readInstalledManifest(config.profile, name, activeProfileDir) as { kind?: unknown } | null
+            if (m !== null && typeof m.kind === 'string' && m.kind !== '') kinds[name] = m.kind
+          }
+        }
         sendJson(response, 200, {
           profile: config.profile,
           installed,
@@ -1052,6 +1064,7 @@ export function mountMarketRoutes(
           present,
           activation,
           diagnostics,
+          kinds,
           live: listHotMounts(),
           disabled: [...disabled],
           groups,

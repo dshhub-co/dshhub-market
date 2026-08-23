@@ -332,9 +332,18 @@
 .unlockedItem{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);padding-top:8px}
 .unlockedItemLine{display:flex;align-items:center;gap:8px;min-width:0}
 .unlockedItemName{flex:1;min-width:0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.unlockedItemKind{flex-shrink:0;font-size:11px;line-height:16px;color:var(--dsw-alias-brand-primary,#4f7cff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.unlockedItemLink{color:var(--dsw-alias-brand-primary,#4f7cff);text-decoration:none}
+.unlockedItemLink:hover{text-decoration:underline}
 .unlockedItemDesc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280);margin-left:24px;display:block}
 .unlockedInstalled{font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,#16a34a)}
+
+/* ---- kind 彩色标签（皮肤/插件/工具/技能/Agent 模式，解锁卡 + 已安装页共用） ---- */
+.kindBadge{font-size:11px;line-height:16px;border-radius:999px;padding:1px 8px;white-space:nowrap;flex-shrink:0;display:inline-block;vertical-align:2px}
+.kindBadgeTheme{color:#db2777;background:rgba(219,39,119,.10);border:1px solid rgba(219,39,119,.32)}
+.kindBadgePlugin{color:#2563eb;background:rgba(37,99,235,.10);border:1px solid rgba(37,99,235,.32)}
+.kindBadgeTool{color:#d97706;background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.32)}
+.kindBadgeSkill{color:#16a34a;background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.32)}
+.kindBadgePreset{color:#7c3aed;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.32)}
 
 /* ---- 解锁卡片 v2（买家体验：去商业味、有人味） ---- */
 .unlockedBy{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280)}

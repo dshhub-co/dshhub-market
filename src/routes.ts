@@ -933,12 +933,13 @@ export function mountMarketRoutes(
           return
         }
         await dropStaleHotMounts()
-        // manifest v2: skill/preset packages are directories under
-        // <profile>/skills|agent-presets/, not npm packages — merged into the
-        // same map with a `skill:`/`preset:` spec so the UI's install/
-        // uninstall/identity matching keeps working. (Presets were missing
-        // here, which made the unlocked-card button flip back to 安装 right
-        // after a successful preset install: refreshInstalled() never saw it.)
+        // manifest v2: skill/preset packages are directories — skills under
+        // <profile>/skills/, presets under <dsh-home>/.agent-presets/ (DSH's
+        // user preset root), not npm packages — merged into the same map with
+        // a `skill:`/`preset:` spec so the UI's install/uninstall/identity
+        // matching keeps working. (Presets were missing here, which made the
+        // unlocked-card button flip back to 安装 right after a successful
+        // preset install: refreshInstalled() never saw it.)
         const skillSpecs = skillSpecMap(activeProfileDir)
         const presetSpecs = presetSpecMap(activeProfileDir)
         const installed = { ...readInstalled(config.profile, activeProfileDir), ...skillSpecs, ...presetSpecs }
@@ -968,7 +969,7 @@ export function mountMarketRoutes(
             // Skills are plain directories, usable the moment they exist.
             ? { state: 'live', reasons: ['技能包：已装入 profile skills 目录（不走 pnpm）'], bundle: false, hot: false }
             : installed[name].startsWith('preset:')
-              ? { state: 'live', reasons: ['预设包：已装入 profile agent-presets 目录（不走 pnpm）'], bundle: false, hot: false }
+              ? { state: 'live', reasons: ['预设包：已装入 DSH 全局预设库 .agent-presets（不走 pnpm）'], bundle: false, hot: false }
               : verifyActivation(config.profile, name, live, activeProfileDir,
                   disabled.has(name) || patchFlags.disabled.includes(name))
         }
@@ -2322,8 +2323,9 @@ export function mountMarketRoutes(
               return
             }
             // manifest v2: preset packages install as plain directories under
-            // <profile>/agent-presets/ — they are NOT npm packages, so they never go
-            // through pnpm. The registry allowlist check above still applies.
+            // <dsh-home>/.agent-presets/ — DSH's user preset root, NOT npm
+            // packages, so they never go through pnpm. The registry allowlist
+            // check above still applies.
             if (entry.kind === 'preset') {
               try {
                 const record = await installPreset(activeProfileDir, entry)
@@ -2333,7 +2335,7 @@ export function mountMarketRoutes(
                   hot: true,
                   preset: record,
                   activation: {
-                    [record.name]: { state: 'live', reasons: ['预设包：已装入 profile agent-presets 目录（不走 pnpm）'], bundle: false, hot: false },
+                    [record.name]: { state: 'live', reasons: ['预设包：已装入 DSH 全局预设库 .agent-presets（不走 pnpm）'], bundle: false, hot: false },
                   },
                   installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir), ...presetSpecMap(activeProfileDir) },
                 })

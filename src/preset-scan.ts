@@ -1,14 +1,18 @@
 /**
  * Scan the local DSH for custom agent presets and skills that the creator
  * can publish to the market:
- *   - presets: <profile>/agent-presets/ (market-installed) AND the DSH-wide
- *     library <dsh-home>/.agent-presets/ (creator-authored modes — "已调好的
- *     模式"), each candidate dir containing agent.cordis.yml
+ *   - presets: DSH's user preset root <dsh-home>/.agent-presets/ — the ONLY
+ *     local root DSH's Agent picker scans. The market installs there too
+ *     (installPreset); clients ≤0.8.13 used <profile>/agent-presets/, which
+ *     DSH never read — migrateLegacyPresets() moved those over. The legacy
+ *     profile root is still scanned below for profiles that predate the
+ *     migration, then dropped once it is gone.
  *   - skills: SKILL.md under <profile>/skills/
  */
 
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { presetsRoot } from './preset-install.ts'
 
 export interface ScannedItem {
   kind: 'preset' | 'skill'
@@ -54,14 +58,17 @@ function readYamlKeys(file: string): { name?: string; description?: string } {
 
 /**
  * 一个 profile 可发布的预设来源：
- *   - <profile>/agent-presets/   市场安装位（本 profile 已装的预设）
- *   - <dsh-home>/.agent-presets/ DSH 全局预设库（创作者自己调好的模式）
+ *   - <dsh-home>/.agent-presets/ DSH 全局预设库（市场安装位 + 创作者自调模式）
+ *   - <profile>/agent-presets/   0.8.14 之前的遗留安装位（迁移后应为空）
  * 默认布局 <home>/profiles/<name> → <home>/.agent-presets；显式目录主机
  * （desktop 自管 profile 位置）若猜不到库路径，由 existsSync 兜底跳过。
  */
 function presetRoots(profileDirectory: string): string[] {
-  const roots = [join(profileDirectory, 'agent-presets')]
-  roots.push(join(dirname(dirname(profileDirectory)), '.agent-presets'))
+  // DSH's user preset root first — the real location the market installs into
+  // and DSH's picker reads. The legacy profile-local root is scanned second
+  // for pre-migration residue, so a duplicate there never shadows the root.
+  const roots = [presetsRoot(profileDirectory)]
+  roots.push(join(profileDirectory, 'agent-presets'))
   return roots.filter(existsSync)
 }
 
@@ -76,7 +83,7 @@ export function scanPresets(profileDirectory: string): ScannedItem[] {
   for (const root of presetRoots(profileDirectory)) {
     for (const name of readdirSync(root)) {
       if (name.startsWith('.') || SKIP_DIRS.has(name)) continue
-      if (seen.has(name)) continue // profile 本地优先，全局库同名不重复
+      if (seen.has(name)) continue // 库根优先，遗留 profile 根同名不重复
       const dir = join(root, name)
       if (!isDir(dir)) continue
       const ymlPath = join(dir, PRESET_YML)

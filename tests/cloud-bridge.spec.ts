@@ -38,7 +38,9 @@ function profileRoot(): string {
 }
 
 function makePreset(name: string): void {
-  const dir = join(profileRoot(), 'agent-presets', name)
+  // DSH user preset root — the location presets live in (market installs and
+  // authored modes); the legacy profile-local root is only migration residue.
+  const dir = join(home, '.agent-presets', name)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'agent.cordis.yml'), `name: ${name}\ntrust: local\n`)
 }

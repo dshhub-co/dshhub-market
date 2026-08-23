@@ -138,11 +138,12 @@ async function installEntry(body: Record<string, unknown>, profile: string): Pro
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   }
-  // manifest v2: preset packages copy into the profile agent-presets dir, no pnpm.
+  // manifest v2: preset packages copy into DSH's user preset root
+  // (<dsh-home>/.agent-presets/, the only root DSH's Agent picker scans), no pnpm.
   if (entry.kind === 'preset') {
     try {
       const record = await installPreset(profileDir(profile), entry)
-      return { ok: true, message: `已安装预设包 ${entry.name}（${record.presets.join('、')} → profile agent-presets 目录）` }
+      return { ok: true, message: `已安装预设包 ${entry.name}（${record.presets.join('、')} → DSH 全局预设库 .agent-presets）` }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }

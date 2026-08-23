@@ -1,9 +1,12 @@
 /**
  * Scan the local DSH for custom agent presets and skills that the creator
  * can publish to the market:
- *   - presets: <profile>/agent-presets/ (market-installed) AND the DSH-wide
- *     library <dsh-home>/.agent-presets/ (creator-authored modes — "已调好的
- *     模式"), each candidate dir containing agent.cordis.yml
+ *   - presets: DSH's user preset root <dsh-home>/.agent-presets/ — the ONLY
+ *     local root DSH's Agent picker scans. The market installs there too
+ *     (installPreset); clients ≤0.8.13 used <profile>/agent-presets/, which
+ *     DSH never read — migrateLegacyPresets() moved those over. The legacy
+ *     profile root is still scanned below for profiles that predate the
+ *     migration, then dropped once it is gone.
  *   - skills: SKILL.md under <profile>/skills/
  */
 export interface ScannedItem {

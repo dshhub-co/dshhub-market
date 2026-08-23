@@ -2,13 +2,24 @@
  * Preset install path (manifest v2, kind=preset): presets are DSH agent mode
  * directories (agent.cordis.yml) that define a complete persona + tool combo.
  * This module downloads the entry's zip, validates the preset structure, and
- * copies each preset directory into <profile>/agent-presets/<preset-name>/.
+ * copies each preset directory into DSH's user preset root:
+ * <dsh-home>/.agent-presets/<preset-name>/.
  *
- * Installed state is recorded under <profile>/agent-presets/.dshhub/<package>.json
- * so uninstall can remove exactly the directories one package brought in.
+ * That home root — NOT <profile>/agent-presets/ — is the only local root DSH's
+ * Agent preset picker scans (dsh's profile-boot overrides the agent-presets
+ * roots to the shipped system presets plus dshHomePath(".agent-presets")).
+ * Clients before 0.8.14 installed into <profile>/agent-presets/, a location
+ * DSH never read: installs "succeeded" yet never appeared in the picker.
+ * migrateLegacyPresets() moves those old installs over on first read.
+ *
+ * Installed state is recorded under <root>/.dshhub/<package>.json (the .dshhub
+ * dir name never matches DSH's PRESET_ID /^[a-z0-9][a-z0-9-]*$/, so the scan
+ * skips it) so uninstall can remove exactly the directories one package
+ * brought in.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { unzipSync } from 'fflate'
 import { marketFetch } from './net.ts'
@@ -21,28 +32,37 @@ export interface InstalledPreset {
   /** Package (manifest) name, also the installed-map key. */
   name: string
   version: string
-  /** Preset dir names copied into the profile agent-presets root. */
+  /** Preset dir names copied into the DSH user preset root. */
   presets: string[]
   url: string
   installedAt: string
 }
 
-/** Profile agent-presets root (may not exist yet). */
-export function presetsRoot(profileDirectory: string): string {
+/** DSH home: the root DSH resolves preset dirs against (mirrors profile.ts). */
+export function dshHome(): string {
+  return process.env.DSH_HOME ?? join(homedir(), '.dsh')
+}
+
+/**
+ * DSH user preset root — the directory DSH's Agent preset picker scans for
+ * user-authored presets (dshHomePath(".agent-presets")). May not exist yet.
+ */
+export function presetsRoot(_profileDirectory: string): string {
+  return join(dshHome(), '.agent-presets')
+}
+
+/** Legacy root (<profile>/agent-presets/) used by clients before 0.8.14. */
+function legacyPresetsRoot(profileDirectory: string): string {
   return join(profileDirectory, 'agent-presets')
 }
 
-function statePath(profileDirectory: string, name: string): string {
-  return join(profileDirectory, 'agent-presets', PRESET_STATE_DIR, `${name}.json`)
+function statePathAt(root: string, name: string): string {
+  return join(root, PRESET_STATE_DIR, `${name}.json`)
 }
 
-function safeName(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]/g, '-')
-}
-
-/** Installed preset packages: package name → record. */
-export function readInstalledPresets(profileDirectory: string): Record<string, InstalledPreset> {
-  const dir = join(profileDirectory, 'agent-presets', PRESET_STATE_DIR)
+/** Installed preset packages: package name → record, read from one root. */
+function readInstalledPresetsAt(root: string): Record<string, InstalledPreset> {
+  const dir = join(root, PRESET_STATE_DIR)
   if (!existsSync(dir)) return {}
   const out: Record<string, InstalledPreset> = {}
   for (const file of readdirSync(dir)) {
@@ -55,6 +75,59 @@ export function readInstalledPresets(profileDirectory: string): Record<string, I
     }
   }
   return out
+}
+
+/**
+ * One-time migration from the legacy profile-local root (≤0.8.13) into DSH's
+ * user preset root. The old location was never scanned by DSH, so presets
+ * installed there never appeared in the Agent picker. Each state record and
+ * the preset dirs it tracks move to the new root; the legacy state dir and an
+ * emptied legacy root are removed. Untracked files left behind are untouched.
+ * State is written AFTER the dirs so an interrupted migration self-heals: a
+ * dir without state is just "not installed" and the next install overwrites
+ * it; state without a dir would make uninstall delete nothing.
+ */
+function migrateLegacyPresets(profileDirectory: string): void {
+  const legacy = legacyPresetsRoot(profileDirectory)
+  if (!existsSync(join(legacy, PRESET_STATE_DIR))) return
+  const root = presetsRoot(profileDirectory)
+  const records = readInstalledPresetsAt(legacy)
+  for (const record of Object.values(records)) {
+    if (existsSync(statePathAt(root, record.name))) continue // newer state already there
+    for (const dir of record.presets) {
+      const src = join(legacy, dir)
+      if (!existsSync(src)) continue
+      const dest = join(root, dir)
+      rmSync(dest, { recursive: true, force: true })
+      try {
+        renameSync(src, dest)
+      } catch {
+        // rename failure (e.g. cross-device) — copy then remove instead
+        rmSync(dest, { recursive: true, force: true })
+        cpSync(src, dest, { recursive: true })
+        rmSync(src, { recursive: true, force: true })
+      }
+    }
+    mkdirSync(join(root, PRESET_STATE_DIR), { recursive: true })
+    writeFileSync(statePathAt(root, record.name), JSON.stringify(record, null, 2))
+  }
+  rmSync(join(legacy, PRESET_STATE_DIR), { recursive: true, force: true })
+  try {
+    // Finder's .DS_Store residue doesn't count as content worth keeping.
+    if (readdirSync(legacy).every(name => name.startsWith('.'))) {
+      rmSync(legacy, { recursive: true, force: true })
+    }
+  } catch { /* legacy root unreadable — leave it */ }
+}
+
+function safeName(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]/g, '-')
+}
+
+/** Installed preset packages: package name → record (new root, post-migration). */
+export function readInstalledPresets(profileDirectory: string): Record<string, InstalledPreset> {
+  migrateLegacyPresets(profileDirectory)
+  return readInstalledPresetsAt(presetsRoot(profileDirectory))
 }
 
 /** Installed-map entries for preset packages: name → `preset:<url>` spec. */
@@ -111,9 +184,11 @@ function assertSafePath(name: string): void {
 
 /**
  * Install a kind=preset catalog entry: download → validate → copy preset dirs
- * into <profile>/agent-presets/. Throws with a Chinese error on failure.
+ * into <dsh-home>/.agent-presets/. Throws with a Chinese error on failure.
  */
 export async function installPreset(profileDirectory: string, entry: RegistryPlugin): Promise<InstalledPreset> {
+  migrateLegacyPresets(profileDirectory)
+  const root = presetsRoot(profileDirectory)
   if (typeof entry.zip !== 'string' || entry.zip === '') {
     throw new Error('该预设包没有可下载的 zip 源')
   }
@@ -145,7 +220,7 @@ export async function installPreset(profileDirectory: string, entry: RegistryPlu
 
     // Use the directory basename as the installed preset name (matches DSH convention).
     const presetName = dir.split('/').pop() ?? dir
-    const dest = join(profileDirectory, 'agent-presets', presetName)
+    const dest = join(root, presetName)
     rmSync(dest, { recursive: true, force: true })
     let count = 0
     for (const [name, data] of Object.entries(rooted)) {
@@ -172,8 +247,8 @@ export async function installPreset(profileDirectory: string, entry: RegistryPlu
     url: entry.url,
     installedAt: new Date().toISOString(),
   }
-  mkdirSync(join(profileDirectory, 'agent-presets', PRESET_STATE_DIR), { recursive: true })
-  writeFileSync(statePath(profileDirectory, record.name), JSON.stringify(record, null, 2))
+  mkdirSync(join(root, PRESET_STATE_DIR), { recursive: true })
+  writeFileSync(statePathAt(root, record.name), JSON.stringify(record, null, 2))
   return record
 }
 
@@ -181,10 +256,11 @@ export async function installPreset(profileDirectory: string, entry: RegistryPlu
 export function uninstallPreset(profileDirectory: string, name: string): boolean {
   const record = readInstalledPresets(profileDirectory)[name]
   if (record === undefined) return false
+  const root = presetsRoot(profileDirectory)
   for (const dir of record.presets) {
-    rmSync(join(profileDirectory, 'agent-presets', dir), { recursive: true, force: true })
+    rmSync(join(root, dir), { recursive: true, force: true })
   }
-  rmSync(statePath(profileDirectory, name), { force: true })
+  rmSync(statePathAt(root, name), { force: true })
   return true
 }
 

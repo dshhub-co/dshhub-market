@@ -29,7 +29,7 @@ export interface PublishResult {
  * 多行字段统一用换行分隔字符串，与口令卡（bundles 表、解锁卡渲染）的既有约定一致。
  */
 export interface PublishItemInfo {
-  /** 教程/演示视频链接（preset/skill 平台硬必填，抖音/B站/YouTube 均可） */
+  /** 教程/演示视频链接（抖音/B站/YouTube 均可；可选） */
   demo?: string
   /** 使用指南链接，每行一条 */
   teachingLinks?: string

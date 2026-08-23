@@ -3,9 +3,11 @@
  * directories (SKILL.md + agents/ + scripts/ + assets/) that the agent
  * consumes directly — they are NOT npm packages, so they never go through
  * pnpm. This module downloads the entry's zip, validates the skill structure,
- * and copies each skill directory into <profile>/skills/<skill-name>/.
+ * and copies each skill directory into the DSH user skills root
+ * ~/.dsh/skills/<skill-name>/ — DSH only loads skills from that root;
+ * the profile-level <profile>/skills/ is not scanned (user-verified).
  *
- * Installed state is recorded under <profile>/skills/.dshhub/<package>.json
+ * Installed state is recorded under ~/.dsh/skills/.dshhub/<package>.json
  * so uninstall can remove exactly the directories one package brought in.
  */
 
@@ -13,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { dirname, join } from 'node:path'
 import { unzipSync } from 'fflate'
 import { marketFetch } from './net.ts'
+import { dshHome } from './preset-install.ts'
 import type { RegistryPlugin } from './registry.ts'
 
 /** Bookkeeping dir inside the skills root (hidden from the agent's skill scan). */
@@ -22,7 +25,7 @@ export interface InstalledSkill {
   /** Package (manifest) name, also the installed-map key. */
   name: string
   version: string
-  /** Skill dir names copied into the profile skills root. */
+  /** Skill dir names copied into the user skills root. */
   skills: string[]
   /** Frontmatter names from each SKILL.md. */
   skillNames: string[]
@@ -30,13 +33,13 @@ export interface InstalledSkill {
   installedAt: string
 }
 
-/** Profile skills root (may not exist yet). */
-export function skillsRoot(profileDirectory: string): string {
-  return join(profileDirectory, 'skills')
+/** DSH user skills root ~/.dsh/skills (may not exist yet). */
+export function skillsRoot(_profileDirectory: string): string {
+  return join(dshHome(), 'skills')
 }
 
-function statePath(profileDirectory: string, name: string): string {
-  return join(profileDirectory, 'skills', SKILL_STATE_DIR, `${name}.json`)
+function statePath(_profileDirectory: string, name: string): string {
+  return join(dshHome(), 'skills', SKILL_STATE_DIR, `${name}.json`)
 }
 
 function safeName(value: string): string {
@@ -44,8 +47,8 @@ function safeName(value: string): string {
 }
 
 /** Installed skill packages: package name → record. */
-export function readInstalledSkills(profileDirectory: string): Record<string, InstalledSkill> {
-  const dir = join(profileDirectory, 'skills', SKILL_STATE_DIR)
+export function readInstalledSkills(_profileDirectory: string): Record<string, InstalledSkill> {
+  const dir = join(dshHome(), 'skills', SKILL_STATE_DIR)
   if (!existsSync(dir)) return {}
   const out: Record<string, InstalledSkill> = {}
   for (const file of readdirSync(dir)) {
@@ -143,7 +146,7 @@ function assertSafePath(name: string): void {
  * Install a kind=skill catalog entry: download → validate → copy skill dirs
  * into the profile skills root. Throws with a Chinese error on failure.
  */
-export async function installSkill(profileDirectory: string, entry: RegistryPlugin): Promise<InstalledSkill> {
+export async function installSkill(_profileDirectory: string, entry: RegistryPlugin): Promise<InstalledSkill> {
   if (typeof entry.zip !== 'string' || entry.zip === '') {
     throw new Error('该技能包没有可下载的 zip 源')
   }
@@ -184,8 +187,8 @@ export async function installSkill(profileDirectory: string, entry: RegistryPlug
     if (skillName === '') throw new Error(`${dir}/SKILL.md 的 frontmatter 缺少 name`)
     skillNames.push(skillName)
 
-    // Copy every file under the skill dir into <skillsRoot>/<skillName>/
-    const dest = join(profileDirectory, 'skills', skillName)
+    // Copy every file under the skill dir into <user-skills-root>/<skillName>/
+    const dest = join(dshHome(), 'skills', skillName)
     rmSync(dest, { recursive: true, force: true })
     let count = 0
     for (const [name, data] of Object.entries(rooted)) {
@@ -213,19 +216,19 @@ export async function installSkill(profileDirectory: string, entry: RegistryPlug
     url: entry.url,
     installedAt: new Date().toISOString(),
   }
-  mkdirSync(join(profileDirectory, 'skills', SKILL_STATE_DIR), { recursive: true })
-  writeFileSync(statePath(profileDirectory, record.name), JSON.stringify(record, null, 2))
+  mkdirSync(join(dshHome(), 'skills', SKILL_STATE_DIR), { recursive: true })
+  writeFileSync(statePath(dshHome(), record.name), JSON.stringify(record, null, 2))
   return record
 }
 
 /** Remove every skill dir a package brought in, then its state record. */
-export function uninstallSkill(profileDirectory: string, name: string): boolean {
-  const record = readInstalledSkills(profileDirectory)[name]
+export function uninstallSkill(_profileDirectory: string, name: string): boolean {
+  const record = readInstalledSkills(dshHome())[name]
   if (record === undefined) return false
   for (const dir of record.skills) {
-    rmSync(join(profileDirectory, 'skills', dir), { recursive: true, force: true })
+    rmSync(join(dshHome(), 'skills', dir), { recursive: true, force: true })
   }
-  rmSync(statePath(profileDirectory, name), { force: true })
+  rmSync(statePath(dshHome(), name), { force: true })
   return true
 }
 

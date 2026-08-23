@@ -21,10 +21,17 @@ export interface PublishUploadBody {
     items?: Array<{
         kind?: string;
         name?: string;
+        demo?: string;
+        teachingLinks?: string;
+        gettingStarted?: string;
+        faq?: string;
+        contact?: string;
+        changelog?: string;
     }>;
     token?: string;
     accountId?: string;
     authorName?: string;
+    /** 旧版发布页的兼容通道：逐项信息缺省时回落（新页面已把 demo 放到每项上） */
     demoUrl?: string;
 }
 export declare function createBridgeServer(opts: {
@@ -33,6 +40,9 @@ export declare function createBridgeServer(opts: {
 /**
  * 打包发布：重扫本机 profile，把 body.items 里 kind+name 匹配到的项
  * 交给 publishItems（客户端打包 zip → 上传平台 /api/creator/upload）。
+ * 每项附带的开发者↔买家沟通字段（demo/teachingLinks/gettingStarted/faq/
+ * contact/changelog）绑定到对应 ScannedItem 旁逐项传入；旧版发布页只发顶层
+ * demoUrl 时回落为 { demo: demoUrl }。
  */
 export declare function publishUpload(body: PublishUploadBody, profile: string): Promise<PublishResult>;
 /**

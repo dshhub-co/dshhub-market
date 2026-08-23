@@ -529,3 +529,65 @@ describe('sameOrigin', () => {
     }
   })
 })
+
+describe('口令解锁记录删除 /dsh-market/unlocked/remove', () => {
+  const unlockFile = () => {
+    mkdirSync(join(dir, '.dshhub-market'), { recursive: true })
+    return join(dir, '.dshhub-market', 'unlocked.json')
+  }
+  const record = (id: string, bundleId: string, name: string) => ({
+    id, bundleId, name,
+    description: '', teachingLinks: '', originalAuthors: '', sellerNote: '',
+    tutorialVideo: '', gettingStarted: '', faq: '', supportHours: '',
+    updateNote: '', contact: '', creatorName: '', bundleUpdatedAt: '',
+    items: [], redeemedAt: new Date(0).toISOString(),
+  })
+
+  it('answers 405 with Allow: POST on non-POST methods', async () => {
+    const res = await hit(routes, '/dsh-market/unlocked/remove', { method: 'GET', url: '/dsh-market/unlocked/remove' })
+    expect(res.status).toBe(405)
+    expect(res.headers.allow).toBe('POST')
+  })
+
+  it('rejects a cross-origin POST with 403', async () => {
+    const res = await hit(routes, '/dsh-market/unlocked/remove', {
+      method: 'POST', url: '/dsh-market/unlocked/remove',
+      origin: 'http://evil.example', host: HOST, body: { id: 'r-1' },
+    })
+    expect(res.status).toBe(403)
+    expect(jsonBody(res)).toEqual({ error: 'untrusted origin' })
+  })
+
+  it('rejects a body without id with 400', async () => {
+    const res = await hit(routes, '/dsh-market/unlocked/remove', post('/dsh-market/unlocked/remove', {}))
+    expect(res.status).toBe(400)
+    expect(jsonBody(res)).toEqual({ error: '缺少记录 id' })
+  })
+
+  it('removes the record, persists to disk and returns the fresh list', async () => {
+    writeFileSync(unlockFile(), JSON.stringify({
+      profileKey: 'k',
+      bundles: [record('r-1', 'bundle-a', 'A'), record('r-2', 'bundle-b', 'B')],
+    }))
+    const res = await hit(routes, '/dsh-market/unlocked/remove', post('/dsh-market/unlocked/remove', { id: 'r-1' }))
+    expect(res.status).toBe(200)
+    const body = jsonBody(res)
+    expect(body).toMatchObject({ ok: true, removed: true })
+    const bundles = (body.bundles as Array<{ id: string }>).map(b => b.id)
+    expect(bundles).toEqual(['r-2'])
+    const onDisk = JSON.parse(readFileSync(unlockFile(), 'utf8')) as { bundles: Array<{ id: string }> }
+    expect(onDisk.bundles.map(b => b.id)).toEqual(['r-2'])
+  })
+
+  it('is idempotent: unknown id returns removed: false and leaves the file unchanged', async () => {
+    writeFileSync(unlockFile(), JSON.stringify({
+      profileKey: 'k',
+      bundles: [record('r-1', 'bundle-a', 'A')],
+    }))
+    const res = await hit(routes, '/dsh-market/unlocked/remove', post('/dsh-market/unlocked/remove', { id: 'r-404' }))
+    expect(res.status).toBe(200)
+    expect(jsonBody(res)).toMatchObject({ ok: true, removed: false })
+    const onDisk = JSON.parse(readFileSync(unlockFile(), 'utf8')) as { bundles: Array<{ id: string }> }
+    expect(onDisk.bundles.map(b => b.id)).toEqual(['r-1'])
+  })
+})

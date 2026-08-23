@@ -307,6 +307,18 @@ export function writeUnlockedState(profileDir: string, state: UnlockedState): vo
 }
 
 /**
+ * 删除一条口令解锁记录（买家侧）：只移走卡片，已安装的插件不受影响。
+ * 找不到该记录时返回 false 且不写盘（幂等）。
+ */
+export function removeUnlockedRecord(profileDir: string, id: string): boolean {
+  const state = readUnlockedState(profileDir)
+  const next = state.bundles.filter((b) => b.id !== id)
+  if (next.length === state.bundles.length) return false
+  writeUnlockedState(profileDir, { ...state, bundles: next })
+  return true
+}
+
+/**
  * 无感绑定：每个 profile 一次性生成的口令身份。
  * 不注册、不填手机号、不绑机器码——买家只输码，这个 key 全程自动。
  * 存于 profile 目录，重装市场 / 重启 DSH 不变。

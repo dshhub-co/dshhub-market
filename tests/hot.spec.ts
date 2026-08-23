@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { hotMount, hotUnmount, listHotMounts, mountClientOnlyDeps, parseSimplePatch } from '../src/hot.ts'
+import { hotMount, hotUnmount, listHotMounts, mountClientOnlyDeps, parseSimplePatch, readUnlockedState, removeUnlockedRecord, writeUnlockedState } from '../src/hot.ts'
 
 // The harness-vendored Include class is not importable in the unit lane;
 // a minimal stand-in lets hotMount succeed so the skip logic is observable.
@@ -235,5 +235,38 @@ describe('parseSimplePatch — hot-mountable or restart-only', () => {
     expect(parseSimplePatch('')).toBeNull()
     expect(parseSimplePatch('# only a comment\n\n')).toBeNull()
     expect(parseSimplePatch('- insert:\n')).toBeNull()
+  })
+})
+
+describe('removeUnlockedRecord — 口令解锁记录删除', () => {
+  const record = (id: string, bundleId: string, name: string) => ({
+    id, bundleId, name,
+    description: '', teachingLinks: '', originalAuthors: '', sellerNote: '',
+    tutorialVideo: '', gettingStarted: '', faq: '', supportHours: '',
+    updateNote: '', contact: '', creatorName: '', bundleUpdatedAt: '',
+    items: [], redeemedAt: new Date(0).toISOString(),
+  })
+
+  it('removes the record and persists the trimmed list', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dshm-unlock-'))
+    try {
+      writeUnlockedState(dir, { profileKey: 'k', bundles: [record('r-1', 'bundle-a', 'A'), record('r-2', 'bundle-b', 'B')] })
+      expect(removeUnlockedRecord(dir, 'r-1')).toBe(true)
+      const state = readUnlockedState(dir)
+      expect(state.bundles.map(b => b.id)).toEqual(['r-2'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns false and leaves the file untouched when the id is absent (idempotent)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dshm-unlock-'))
+    try {
+      writeUnlockedState(dir, { profileKey: 'k', bundles: [record('r-1', 'bundle-a', 'A')] })
+      expect(removeUnlockedRecord(dir, 'r-404')).toBe(false)
+      expect(readUnlockedState(dir).bundles.map(b => b.id)).toEqual(['r-1'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

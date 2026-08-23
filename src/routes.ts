@@ -15,7 +15,8 @@ import { loadRegistry, type RegistryPlugin } from './registry.ts'
 import {
   cleanHotDir, getOrCreateProfileKey, hotMount, hotUnmount, listHotMounts,
   mountClientOnlyDeps, purgeMarketState, readMarketState, readUnlockedState,
-  writeMarketState, writeUnlockedState, type UnlockedBundleRecord,
+  removeUnlockedRecord, writeMarketState, writeUnlockedState,
+  type UnlockedBundleRecord, type UnlockedState,
 } from './hot.ts'
 import { createGroup, deleteGroup, removeFromGroups, renameGroup, setGroupMembers } from './groups.ts'
 import { exportLogs, logEvent } from './log.ts'
@@ -33,6 +34,21 @@ import { analyzeProfile } from './check.ts'
  * 同一口令包判定：bundleId 相同时同包；无 bundleId（演示码等）按名称 + 条目
  * 地址集合判定。用于重复输码去重。
  */
+/** 归一化：同一包只保留一张卡片（旧版本可能存过重复记录，读到即清理）。 */
+function dedupeUnlocked(state: UnlockedState): {
+  bundles: UnlockedBundleRecord[]
+  changed: boolean
+} {
+  const seen = new Set<string>()
+  const bundles = state.bundles.filter((b) => {
+    const key = b.bundleId !== '' ? `b:${b.bundleId}` : `n:${b.name}|${b.items.map((i) => i.url ?? i.pluginId ?? '').sort().join('|')}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  return { bundles, changed: bundles.length !== state.bundles.length }
+}
+
 function sameBundle(a: UnlockedBundleRecord, b: UnlockedBundleRecord): boolean {
   if (a.bundleId !== '' && b.bundleId !== '') return a.bundleId === b.bundleId
   if (a.name === '' || a.name !== b.name) return false
@@ -925,17 +941,39 @@ export function mountMarketRoutes(
         try {
           // 归一化：同一包只保留一张卡片；旧版本可能存过重复记录，读到即清理
           const state = readUnlockedState(activeProfileDir)
-          const seen = new Set<string>()
-          const deduped = state.bundles.filter((b) => {
-            const key = b.bundleId !== '' ? `b:${b.bundleId}` : `n:${b.name}|${b.items.map((i) => i.url ?? i.pluginId ?? '').sort().join('|')}`
-            if (seen.has(key)) return false
-            seen.add(key)
-            return true
-          })
-          if (deduped.length !== state.bundles.length) {
-            writeUnlockedState(activeProfileDir, { ...state, bundles: deduped })
+          const { bundles, changed } = dedupeUnlocked(state)
+          if (changed) writeUnlockedState(activeProfileDir, { ...state, bundles })
+          sendJson(response, 200, { bundles })
+        } catch (error) {
+          sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
+        }
+      },
+    }),
+
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/unlocked/remove',
+      handler: async (request, response) => {
+        if (request.method !== 'POST') {
+          response.writeHead(405, { allow: 'POST' })
+          response.end()
+          return
+        }
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'untrusted origin' })
+          return
+        }
+        try {
+          const body = (await readJsonBody(request)) as { id?: unknown }
+          const id = typeof body.id === 'string' ? body.id.trim() : ''
+          if (id === '') {
+            sendJson(response, 400, { error: '缺少记录 id' })
+            return
           }
-          sendJson(response, 200, { bundles: deduped })
+          // 只删解锁记录，已安装的插件不受影响；找不到返回 removed: false（幂等）
+          const removed = removeUnlockedRecord(activeProfileDir, id)
+          const { bundles } = dedupeUnlocked(readUnlockedState(activeProfileDir))
+          sendJson(response, 200, { ok: true, removed, bundles })
         } catch (error) {
           sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
         }

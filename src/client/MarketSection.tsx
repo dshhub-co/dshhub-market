@@ -739,6 +739,10 @@ export function MarketSection(props: MarketSectionProps) {
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)
   const [removingName, setRemovingName] = useState<string | null>(null)
   const [removedCount, setRemovedCount] = useState(0)
+  /** 口令解锁记录删除确认（记录 id）——只删记录，不影响已安装。 */
+  const [unlockDeleteId, setUnlockDeleteId] = useState<string | null>(null)
+  const [unlockDeleting, setUnlockDeleting] = useState(false)
+  const [unlockDeleteFail, setUnlockDeleteFail] = useState<string | null>(null)
   /** Toggles whose live fiber did not follow the switch — restart to apply. */
   const [toggleRestart, setToggleRestart] = useState(0)
   /**
@@ -1211,6 +1215,33 @@ export function MarketSection(props: MarketSectionProps) {
       .catch(error => setInstallError(String(error)))
       .finally(() => setUnlockBusyUrl(null))
   }, [refreshInstalled])
+
+  /** 删除一条口令解锁记录：只动 unlocked.json，已安装的插件不受影响。 */
+  const doRemoveUnlock = useCallback(async () => {
+    if (unlockDeleteId === null) return
+    setUnlockDeleting(true)
+    setUnlockDeleteFail(null)
+    try {
+      const res = await fetch('/dsh-market/unlocked/remove', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: unlockDeleteId }),
+      })
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        error?: string
+        bundles?: UnlockedBundle[]
+      }
+      if (!res.ok || body.ok !== true) throw new Error(body.error ?? `HTTP ${res.status}`)
+      // 服务端返回去重后的最新列表，直接刷新卡片区
+      if (Array.isArray(body.bundles)) setUnlocked(body.bundles)
+      setUnlockDeleteId(null)
+    } catch (e) {
+      setUnlockDeleteFail(e instanceof Error ? e.message : String(e))
+    } finally {
+      setUnlockDeleting(false)
+    }
+  }, [unlockDeleteId])
 
   const compatibilitySummary = (risks: CompatibilityNotice['risks']): string => {
     if (risks.length === 0) return ''
@@ -2409,6 +2440,13 @@ export function MarketSection(props: MarketSectionProps) {
                           <span className={css.unlockedAt}>
                             {t('unlockedAt').replace('{0}', new Date(bundle.redeemedAt).toLocaleDateString())}
                           </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setUnlockDeleteFail(null); setUnlockDeleteId(bundle.id) }}
+                          >
+                            {t('unlockDelete')}
+                          </Button>
                         </div>
                         {(bundle.creatorName ?? '') !== '' && (
                           <div className={css.unlockedBy}>{t('byAuthor').replace('{0}', bundle.creatorName)}</div>
@@ -3257,6 +3295,25 @@ export function MarketSection(props: MarketSectionProps) {
             </>
           )}
         />
+      )}
+      {unlockDeleteId !== null && (
+        <Modal
+          open
+          onClose={() => setUnlockDeleteId(null)}
+          title={t('unlockDeleteConfirm')}
+          footer={(
+            <>
+              <Button variant="ghost" onClick={() => setUnlockDeleteId(null)}>{t('cancel')}</Button>
+              <Button variant="primary" disabled={unlockDeleting} onClick={() => void doRemoveUnlock()}>
+                {unlockDeleting ? t('unlockDeleteWorking') : t('unlockDelete')}
+              </Button>
+            </>
+          )}
+        >
+          {unlockDeleteFail !== null && (
+            <p className={css.modalNote}>{t('unlockDeleteFail') + '：' + unlockDeleteFail}</p>
+          )}
+        </Modal>
       )}
       {restoreConfirmOpen && pendingBackup !== null && (
         <Modal

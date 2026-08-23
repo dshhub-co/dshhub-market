@@ -330,8 +330,9 @@
 .unlockedAuthors{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary,#8b93a1)}
 .unlockedLabel{font-weight:600;color:var(--dsw-alias-label-secondary,#6b7280);margin-right:6px}
 .unlockedItem{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);padding-top:8px}
-.unlockedItemLine{display:flex;align-items:center;gap:8px;min-width:0}
-.unlockedItemName{flex:1;min-width:0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlockedItemLine{display:flex;align-items:center;gap:6px;min-width:0}
+/* 名字不撑满整行（flex:1 会把类型标签推到行尾）——标签紧挨名字 */
+.unlockedItemName{min-width:0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .unlockedItemLink{color:var(--dsw-alias-brand-primary,#4f7cff);text-decoration:none}
 .unlockedItemLink:hover{text-decoration:underline}
 .unlockedItemDesc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280);margin-left:24px;display:block}

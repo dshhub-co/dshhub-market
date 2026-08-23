@@ -7,7 +7,9 @@
  *     DSH never read — migrateLegacyPresets() moved those over. The legacy
  *     profile root is still scanned below for profiles that predate the
  *     migration, then dropped once it is gone.
- *   - skills: SKILL.md under <profile>/skills/
+ *   - skills: SKILL.md under <dsh-home>/skills (DSH's user-level skill root,
+ *     the official home for personal skills — visible to any session) plus
+ *     <profile>/skills/ (the market's kind=skill install location).
  */
 export interface ScannedItem {
     kind: 'preset' | 'skill';
@@ -24,7 +26,7 @@ export interface ScannedItem {
  */
 export declare function scanPresets(profileDirectory: string): ScannedItem[];
 /**
- * Scan <profile>/skills/ for skill directories (containing SKILL.md).
+ * Scan both skill roots for skill directories (containing SKILL.md).
  * Each directory with a valid frontmatter name is a candidate.
  */
 export declare function scanSkills(profileDirectory: string): ScannedItem[];

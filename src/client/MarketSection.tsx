@@ -190,6 +190,132 @@ function parseContacts(text: string): ContactRow[] {
   return rows
 }
 
+/** 开发者→买家沟通字段（registry 条目上镜像 manifest v2 的六个字段）。 */
+type CreatorInfoFields = {
+  demo?: string
+  teachingLinks?: string
+  gettingStarted?: string
+  faq?: string
+  contact?: string
+  changelog?: string
+}
+
+type CreatorInfoSection = 'demo' | 'steps' | 'links' | 'faq' | 'contact' | 'changelog'
+const CREATOR_INFO_SECTIONS: CreatorInfoSection[] = ['demo', 'steps', 'links', 'faq', 'contact', 'changelog']
+
+/**
+ * 渲染开发者在发布弹窗里填的沟通资料：教程视频（B站/YouTube 内嵌，其余外链）、
+ * 上手步骤、使用指南链接、常见问题、联系方式、更新说明。全空返回 null。
+ * 复用解锁卡（unlocked*）的既有 CSS 类与渲染约定（split('\n')/parseFaq/parseContacts）。
+ * 用在：插件卡紧凑条（demo/links/changelog）与安装确认弹窗（全部六项）。
+ */
+function PluginCreatorInfo({
+  fields,
+  t,
+  sections = CREATOR_INFO_SECTIONS,
+  copied,
+  onCopy,
+}: {
+  fields: CreatorInfoFields
+  t: Translate
+  sections?: CreatorInfoSection[]
+  copied?: string | null
+  onCopy?: (value: string) => void
+}) {
+  const show = new Set(sections)
+  const demo = show.has('demo') && (fields.demo ?? '') !== ''
+    ? parseVideo(fields.demo ?? '')
+    : null
+  const steps = show.has('steps') ? (fields.gettingStarted ?? '').split('\n').map(s => s.trim()).filter(Boolean) : []
+  const links = show.has('links') ? (fields.teachingLinks ?? '').split('\n').map(s => s.trim()).filter(Boolean) : []
+  const faqs = show.has('faq') ? parseFaq(fields.faq ?? '') : []
+  const contacts = show.has('contact') ? parseContacts(fields.contact ?? '') : []
+  const changelog = show.has('changelog') ? (fields.changelog ?? '').trim() : ''
+
+  if (demo === null && steps.length === 0 && links.length === 0 && faqs.length === 0
+    && contacts.length === 0 && changelog === '') return null
+
+  return (
+    <div className={css.creatorInfo}>
+      {demo !== null && (
+        demo.kind === 'embed'
+          ? (
+              <div className={css.unlockedVideo}>
+                <iframe
+                  className={css.unlockedFrame}
+                  src={demo.embedUrl}
+                  title="demo"
+                  allow="fullscreen"
+                  referrerPolicy="no-referrer"
+                />
+                <a className={css.unlockedExternal} href={demo.url} target="_blank" rel="noreferrer">
+                  {t('videoFallback')}
+                </a>
+              </div>
+            )
+          : (
+              <a className={css.unlockedVideoLink} href={demo.url} target="_blank" rel="noreferrer">
+                ▶ {t('videoLabel')}（{t('openExternal')}）
+              </a>
+            )
+      )}
+
+      {steps.length > 0 && (
+        <div className={css.unlockedSteps}>
+          <span className={css.unlockedLabel}>{t('stepsLabel')}</span>
+          {steps.map((s, i) => <div key={i} className={css.unlockedStep}>{i + 1}. {s}</div>)}
+        </div>
+      )}
+
+      {links.length > 0 && (
+        <div className={css.unlockedLinks}>
+          <span className={css.unlockedLabel}>{t('teachingLabel')}</span>
+          {links.map((link, i) => (
+            <a key={i} href={link} target="_blank" rel="noreferrer">{link}</a>
+          ))}
+        </div>
+      )}
+
+      {faqs.length > 0 && (
+        <div className={css.unlockedFaq}>
+          <span className={css.unlockedLabel}>{t('faqLabel')}</span>
+          {faqs.map((f, i) => (
+            <div key={i} className={css.unlockedFaqItem}>
+              <div className={css.unlockedFaqQ}>▸ {f.q}</div>
+              <div className={css.unlockedFaqA}>{f.a}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {contacts.length > 0 && (
+        <div className={css.unlockedContact}>
+          <span className={css.unlockedLabel}>{t('contactLabel')}</span>
+          {contacts.map((c, i) => (
+            <div key={i} className={css.unlockedContactRow}>
+              {c.label !== '' && <span className={css.unlockedContactKey}>{c.label}</span>}
+              {c.kind === 'link'
+                ? <a className={css.unlockedContactValue} href={c.value} target="_blank" rel="noreferrer">{c.value}</a>
+                : c.kind === 'mail'
+                  ? <a className={css.unlockedContactValue} href={`mailto:${c.value}`}>{c.value}</a>
+                  : <span className={css.unlockedContactValue}>{c.value}</span>}
+              {c.kind === 'wechat' && onCopy !== undefined && (
+                <Button variant="ghost" size="sm" onClick={() => onCopy(c.value)}>
+                  {copied === c.value ? t('copiedToast') : t('copyBtn')}
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {changelog !== '' && (
+        <div className={css.unlockedUpdate}>🔔 {changelog}</div>
+      )}
+    </div>
+  )
+}
+
 function HostDependencyDiagnostics({
   findings,
   t,
@@ -1799,6 +1925,7 @@ export function MarketSection(props: MarketSectionProps) {
           </div>
         </div>
         <div className={css.desc}>{desc}</div>
+        <PluginCreatorInfo fields={p} t={t} sections={['demo', 'links', 'changelog']} />
         {p.deprecated === true && (
           <div className={css.deprecate}>
             <div className={css.depLine}>
@@ -1901,6 +2028,7 @@ export function MarketSection(props: MarketSectionProps) {
           </div>
         </div>
         <div className={css.desc}>{desc}</div>
+        <PluginCreatorInfo fields={p} t={t} sections={['demo', 'links', 'changelog']} />
         {p.deprecated === true && (
           <div className={css.deprecate}>
             <div className={css.depLine}>
@@ -3081,6 +3209,7 @@ export function MarketSection(props: MarketSectionProps) {
           )}
         >
           <ScreenshotStrip plugin={confirming} />
+          <PluginCreatorInfo fields={confirming} t={t} copied={copied} onCopy={copyText} />
           <DisclosureRow
             icon={<IconCodeOutline16 size={16} />}
             title={t('cmdDetails')}

@@ -320,6 +320,10 @@
 .unlockedName{font-size:14px;line-height:20px;color:var(--dsw-alias-label-primary,#1f2328)}
 .unlockedAt{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary,#8b93a1)}
 .unlockedDesc{font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary,#6b7280);white-space:pre-wrap}
+/* 卡片/弹窗里开发者的沟通资料条（教程视频/步骤/指南/FAQ/联系方式/更新说明） */
+.creatorInfo{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.creatorInfo .unlockedFrame{max-height:220px}
+.creatorInfo .unlockedFaqItem:first-child{border-top:none;padding-top:0}
 .unlockedLinks{display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:18px}
 .unlockedLinks a{color:var(--dsw-alias-brand-primary,#4f7cff);text-decoration:none}
 .unlockedLinks a:hover{text-decoration:underline}

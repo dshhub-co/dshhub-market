@@ -24,6 +24,35 @@ export interface PublishResult {
   published?: Array<{ name: string; id: string; kind: string; version: string }>
 }
 
+/**
+ * 开发者→买家沟通字段（manifest v2，全部可选；非空才写入 zip 的 manifest.json）。
+ * 多行字段统一用换行分隔字符串，与口令卡（bundles 表、解锁卡渲染）的既有约定一致。
+ */
+export interface PublishItemInfo {
+  /** 教程/演示视频链接（preset/skill 平台硬必填，抖音/B站/YouTube 均可） */
+  demo?: string
+  /** 使用指南链接，每行一条 */
+  teachingLinks?: string
+  /** 上手步骤，每行一步 */
+  gettingStarted?: string
+  /** 常见问题，每行一条 Q：/A： */
+  faq?: string
+  /** 联系方式，每行一条（微信/群/邮箱） */
+  contact?: string
+  /** 更新说明 */
+  changelog?: string
+}
+
+/** 从任意原始条目提取六个沟通字段（空值丢弃；供 bridge/routes 复用）。 */
+export function buildPublishInfo(raw: Record<string, unknown>): PublishItemInfo {
+  const info: PublishItemInfo = {}
+  for (const key of ['demo', 'teachingLinks', 'gettingStarted', 'faq', 'contact', 'changelog'] as const) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim() !== '') info[key] = value.trim()
+  }
+  return info
+}
+
 /** Collect all files under a directory recursively into a flat map. */
 function collectFiles(
   rootDir: string,
@@ -66,8 +95,14 @@ function reverseDomainId(name: string): string {
 
 /**
  * Build a manifest.json object for the selected item.
+ * @param info - 开发者→买家沟通字段，非空字符串才写入（空值整字段丢弃）。
  */
-export function buildManifest(item: ScannedItem, accountId: string, authorName: string): Record<string, unknown> {
+export function buildManifest(
+  item: ScannedItem,
+  accountId: string,
+  authorName: string,
+  info?: PublishItemInfo,
+): Record<string, unknown> {
   const baseName = reverseDomainId(item.name)
   const manifest: Record<string, unknown> = {
     manifestVersion: 2,
@@ -86,6 +121,11 @@ export function buildManifest(item: ScannedItem, accountId: string, authorName: 
   } else if (item.kind === 'skill') {
     manifest.skills = [item.dir]
   }
+  if (info !== undefined) {
+    for (const [key, value] of Object.entries(info)) {
+      if (typeof value === 'string' && value.trim() !== '') manifest[key] = value.trim()
+    }
+  }
   return manifest
 }
 
@@ -101,7 +141,8 @@ export async function publishItems(
     token?: string
     accountId: string
     authorName: string
-    demoUrl?: string
+    /** 开发者→买家沟通字段（demo 并入此对象；旧接口的顶层 demoUrl 由调用方转成 { demo }） */
+    info?: PublishItemInfo
   },
 ): Promise<PublishResult> {
   if (items.length === 0) {
@@ -114,8 +155,7 @@ export async function publishItems(
   // 1) Gather files from the source directory
   const sourceFiles = collectFiles(item.path, item.path)
 
-  const baseManifest = buildManifest(item, opts.accountId, opts.authorName)
-  if (opts.demoUrl) baseManifest.demo = opts.demoUrl
+  const baseManifest = buildManifest(item, opts.accountId, opts.authorName, opts.info)
 
   // Structure:
   //   skills/<name>/...   for skill kind

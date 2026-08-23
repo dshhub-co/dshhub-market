@@ -51,7 +51,7 @@ import { entryNeedsZip, materializeTgz, zipKind } from './zip-source.ts'
 import { installSkill, isInstalledSkill, skillSpecMap, uninstallSkill, readInstalledSkills } from './skill-install.ts'
 import { installPreset, isInstalledPreset, presetSpecMap, uninstallPreset, readInstalledPresets } from './preset-install.ts'
 import { scanPresets, scanSkills, type ScannedItem } from './preset-scan.ts'
-import { publishItems } from './publish.ts'
+import { buildPublishInfo, publishItems, type PublishItemInfo } from './publish.ts'
 import { isStaleUpdate, parseIgnoredBuilds, parsePrepareNotAllowed, RELEASE_AGE_OVERRIDE, retargetCollections, validateAddedPlugins, withHoistRecovery } from './install.ts'
 import { asChannel, CHANNELS, DIST_TAG, resolveChannel, type Channel } from './channels.ts'
 import { checkUpdates, fetchNpmLatest, invalidateUpdates, isLocalPathSpec, isUpgrade, latestPublishedRecently, versionOnChannel } from './updates.ts'
@@ -585,14 +585,19 @@ export function mountMarketRoutes(
               return
             }
 
-            // Re-scan to get the actual paths (don't trust client-supplied paths)
+            // Re-scan to get the actual paths (don't trust client-supplied paths);
+            // bind each raw item's 沟通字段 (demo/teachingLinks/…/changelog) to its
+            // scanned match, falling back to the legacy top-level demoUrl.
             const allScanned = [...scanPresets(activeProfileDir), ...scanSkills(activeProfileDir)]
-            const selected: ScannedItem[] = []
-            for (const raw of body.items as Array<{ kind?: string; name?: string }>) {
+            const legacyDemo =
+              typeof body.demoUrl === 'string' && body.demoUrl.trim() !== '' ? { demo: body.demoUrl.trim() } : undefined
+            const selected: Array<{ item: ScannedItem; info?: PublishItemInfo }> = []
+            for (const raw of body.items as Array<Record<string, unknown>>) {
               if (typeof raw.kind !== 'string' || typeof raw.name !== 'string') continue
               const match = allScanned.find(s => s.kind === raw.kind && s.name === raw.name)
-              if (match !== undefined && !selected.some(s => s.kind === match.kind && s.name === match.name)) {
-                selected.push(match)
+              if (match !== undefined && !selected.some(s => s.item.kind === match.kind && s.item.name === match.name)) {
+                const info = buildPublishInfo(raw)
+                selected.push({ item: match, info: Object.keys(info).length > 0 ? info : legacyDemo })
               }
             }
             if (selected.length === 0) {
@@ -600,20 +605,34 @@ export function mountMarketRoutes(
               return
             }
 
-            const result = await publishItems(selected, {
-              apiBase: DSHHUB_API,
-              token: typeof body.token === 'string' ? body.token : undefined,
-              accountId: body.accountId,
-              authorName: typeof body.authorName === 'string' ? body.authorName : '',
-              demoUrl: typeof body.demoUrl === 'string' ? body.demoUrl : undefined,
-            })
-            if (!result.ok) {
-              logEvent('error', 'publish', `upload failed: ${result.error ?? 'unknown'}`)
-              sendJson(response, 502, result)
-              return
+            // 每个条目独立打包发布（与 cloud bridge 一致，一次一个 zip/plugin）
+            const published: Array<{ name: string; id: string; kind: string; version: string }> = []
+            for (const { item, info } of selected) {
+              const result = await publishItems([item], {
+                apiBase: DSHHUB_API,
+                token: typeof body.token === 'string' ? body.token : undefined,
+                accountId: body.accountId,
+                authorName: typeof body.authorName === 'string' ? body.authorName : '',
+                info,
+              })
+              if (!result.ok) {
+                logEvent('error', 'publish', `upload failed: ${result.error ?? 'unknown'}`)
+                sendJson(response, 502, result)
+                return
+              }
+              if (result.name !== undefined && result.id !== undefined) {
+                published.push({
+                  name: result.name,
+                  id: result.id,
+                  kind: result.kind ?? item.kind,
+                  version: result.version ?? '0.0.0',
+                })
+              }
             }
-            logEvent('info', 'publish', `published ${result.name} (${result.id}) v${result.version}`)
-            sendJson(response, 200, result)
+            for (const p of published) {
+              logEvent('info', 'publish', `published ${p.name} (${p.id}) v${p.version}`)
+            }
+            sendJson(response, 200, { ok: true, published })
           })
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)

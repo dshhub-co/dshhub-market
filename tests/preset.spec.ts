@@ -14,7 +14,7 @@ import { scanPresets, scanSkills } from '../src/preset-scan.ts'
 import {
   installPreset, isInstalledPreset, presetSpecMap, readInstalledPresets, uninstallPreset,
 } from '../src/preset-install.ts'
-import { buildManifest, publishItems } from '../src/publish.ts'
+import { buildManifest, buildPublishInfo, publishItems } from '../src/publish.ts'
 
 let home: string
 beforeEach(() => {
@@ -327,12 +327,92 @@ describe('publish manifest', () => {
       token: 'access-token-1',
       accountId: 'u1',
       authorName: '作者',
-      demoUrl: 'https://example.com/demo',
+      info: { demo: 'https://example.com/demo' },
     })
     expect(result.ok).toBe(true)
     expect(result.id).toBe('com.dshhub.my-mode')
     expect(uploadedUrl).toBe('https://www.dshhub.co/api/creator/upload')
     expect(authHeader).toBe('Bearer access-token-1')
+  })
+
+  it('buildManifest writes only non-empty info fields (demo/teachingLinks/…/changelog)', () => {
+    const item = {
+      kind: 'skill' as const,
+      dir: 'skills/kbcut',
+      name: 'kbcut',
+      displayName: '剪片',
+      description: 'desc',
+      path: '/x',
+    }
+    const manifest = buildManifest(item, 'u', 'n', {
+      demo: '  https://v.douyin.com/abc  ',
+      teachingLinks: '',
+      gettingStarted: '第一步\n第二步',
+      faq: 'Q：怎么用？\nA：看视频',
+      contact: '微信：abc',
+      changelog: '修了 bug',
+    })
+    expect(manifest.demo).toBe('https://v.douyin.com/abc') // trim 后写入
+    expect(manifest.teachingLinks).toBeUndefined() // 空字符串整字段丢弃
+    expect(manifest.gettingStarted).toBe('第一步\n第二步')
+    expect(manifest.faq).toBe('Q：怎么用？\nA：看视频')
+    expect(manifest.contact).toBe('微信：abc')
+    expect(manifest.changelog).toBe('修了 bug')
+  })
+
+  it('buildPublishInfo extracts the six fields from a raw payload (empty values dropped)', () => {
+    const raw = {
+      kind: 'preset',
+      name: 'my-mode',
+      demo: 'https://www.bilibili.com/video/BV1xx',
+      teachingLinks: '  ',
+      gettingStarted: '1. 装好\n2. 打开',
+      faq: '',
+      contact: undefined,
+      changelog: 'v1.0.1 修复',
+    }
+    expect(buildPublishInfo(raw)).toEqual({
+      demo: 'https://www.bilibili.com/video/BV1xx',
+      gettingStarted: '1. 装好\n2. 打开',
+      changelog: 'v1.0.1 修复',
+    })
+    expect(buildPublishInfo({})).toEqual({})
+  })
+
+  it('publishes all info fields into the zip manifest.json', async () => {
+    makePreset('my-mode', 'name: 我的模式\ndescription: 测试模式\n')
+    const items = scanPresets(profileRoot())
+    vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const body = init?.body as FormData
+      const file = body.get('file') as File
+      const entries = unzipSync(new Uint8Array(await file.arrayBuffer()))
+      const manifest = JSON.parse(new TextDecoder().decode(entries['manifest.json'])) as Record<string, unknown>
+      expect(manifest.demo).toBe('https://v.douyin.com/abc')
+      expect(manifest.teachingLinks).toBe('https://www.bilibili.com/opus/1\nhttps://www.bilibili.com/opus/2')
+      expect(manifest.gettingStarted).toBe('第一步\n第二步')
+      expect(manifest.faq).toBe('Q：a\nA：b')
+      expect(manifest.contact).toBe('微信：w1')
+      expect(manifest.changelog).toBe('更新说明')
+      return new Response(
+        JSON.stringify({ ok: true, pluginId: 'p1', id: 'com.dshhub.my-mode', name: 'x', version: '1.0.0', kind: 'preset' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }))
+
+    const result = await publishItems(items, {
+      apiBase: 'https://www.dshhub.co',
+      accountId: 'u1',
+      authorName: '作者',
+      info: {
+        demo: 'https://v.douyin.com/abc',
+        teachingLinks: 'https://www.bilibili.com/opus/1\nhttps://www.bilibili.com/opus/2',
+        gettingStarted: '第一步\n第二步',
+        faq: 'Q：a\nA：b',
+        contact: '微信：w1',
+        changelog: '更新说明',
+      },
+    })
+    expect(result.ok).toBe(true)
   })
 
   it('auto-bumps the patch version and retries when the platform rejects with 409', async () => {

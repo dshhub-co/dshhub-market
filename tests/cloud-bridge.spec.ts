@@ -137,9 +137,18 @@ describe('pollOnce', () => {
     expect(mockedUpload).not.toHaveBeenCalled()
   })
 
-  it('upload 任务：把 payload 交给 publishUpload，成功结果以 done 回传', async () => {
+  it('upload 任务：把 payload（含每项沟通字段）原样交给 publishUpload，成功结果以 done 回传', async () => {
     const payload = {
-      items: [{ kind: 'preset', name: 'my-mode' }],
+      items: [{
+        kind: 'preset',
+        name: 'my-mode',
+        demo: 'https://v.douyin.com/abc',
+        teachingLinks: 'https://www.bilibili.com/opus/1',
+        gettingStarted: '第一步',
+        faq: 'Q：a\nA：b',
+        contact: '微信：w1',
+        changelog: '修复',
+      }],
       token: 'tok',
       accountId: 'acc',
       authorName: 'author',

@@ -52,6 +52,19 @@ export interface RegistryPlugin {
   price?: number
   /** fork (dshhub): price currency (default CNY). */
   paidCurrency?: string
+  /** 开发者→买家沟通字段（manifest v2，换行分隔字符串，全可选）。 */
+  /** 教程/演示视频链接（抖音/B站/YouTube）。 */
+  demo?: string
+  /** 使用指南链接，每行一条。 */
+  teachingLinks?: string
+  /** 上手步骤，每行一步。 */
+  gettingStarted?: string
+  /** 常见问题，每行一条 Q：/A：。 */
+  faq?: string
+  /** 联系方式，每行一条（微信/群/邮箱）。 */
+  contact?: string
+  /** 更新说明。 */
+  changelog?: string
 }
 
 /** The catalog payload under `registry` in /dsh-market/registry. */

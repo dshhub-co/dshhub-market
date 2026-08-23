@@ -23,7 +23,7 @@ import { readOwnVersion } from './self-update.ts'
 import { installSkill } from './skill-install.ts'
 import { installPreset } from './preset-install.ts'
 import { scanPresets, scanSkills, type ScannedItem } from './preset-scan.ts'
-import { publishItems, type PublishResult } from './publish.ts'
+import { buildPublishInfo, publishItems, type PublishItemInfo, type PublishResult } from './publish.ts'
 import { profileDir } from './profile.ts'
 
 export const PORTS = [3750, 3751, 3752, 3753, 3754]
@@ -96,10 +96,20 @@ interface InstallOutcome {
 
 /** 发布上传请求体：items 只带 kind+name，实际路径由本机重扫得到（不信任客户端路径）。 */
 export interface PublishUploadBody {
-  items?: Array<{ kind?: string; name?: string }>
+  items?: Array<{
+    kind?: string
+    name?: string
+    demo?: string
+    teachingLinks?: string
+    gettingStarted?: string
+    faq?: string
+    contact?: string
+    changelog?: string
+  }>
   token?: string
   accountId?: string
   authorName?: string
+  /** 旧版发布页的兼容通道：逐项信息缺省时回落（新页面已把 demo 放到每项上） */
   demoUrl?: string
 }
 
@@ -231,6 +241,9 @@ export function createBridgeServer(opts: { profile: string }): ReturnType<typeof
 /**
  * 打包发布：重扫本机 profile，把 body.items 里 kind+name 匹配到的项
  * 交给 publishItems（客户端打包 zip → 上传平台 /api/creator/upload）。
+ * 每项附带的开发者↔买家沟通字段（demo/teachingLinks/gettingStarted/faq/
+ * contact/changelog）绑定到对应 ScannedItem 旁逐项传入；旧版发布页只发顶层
+ * demoUrl 时回落为 { demo: demoUrl }。
  */
 export async function publishUpload(body: PublishUploadBody, profile: string): Promise<PublishResult> {
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -241,12 +254,14 @@ export async function publishUpload(body: PublishUploadBody, profile: string): P
   }
   const dir = profileDir(profile)
   const allScanned = [...scanPresets(dir), ...scanSkills(dir)]
-  const selected: ScannedItem[] = []
+  const legacyDemo =
+    typeof body.demoUrl === 'string' && body.demoUrl.trim() !== '' ? { demo: body.demoUrl.trim() } : undefined
+  const selected: Array<{ item: ScannedItem; info?: PublishItemInfo }> = []
   for (const raw of body.items) {
     if (typeof raw.kind !== 'string' || typeof raw.name !== 'string') continue
     const match = allScanned.find((s) => s.kind === raw.kind && s.name === raw.name)
-    if (match !== undefined && !selected.some((s) => s.kind === match.kind && s.name === match.name)) {
-      selected.push(match)
+    if (match !== undefined && !selected.some((s) => s.item.kind === match.kind && s.item.name === match.name)) {
+      selected.push({ item: match, info: buildPublishInfo(raw as Record<string, unknown>) })
     }
   }
   if (selected.length === 0) {
@@ -254,13 +269,13 @@ export async function publishUpload(body: PublishUploadBody, profile: string): P
   }
   // 每个条目独立打包发布（一次一个 zip/plugin）；任一失败立即返回该错误。
   const published: NonNullable<PublishResult['published']> = []
-  for (const item of selected) {
+  for (const { item, info } of selected) {
     const result = await publishItems([item], {
       apiBase: DSHHUB_API,
       token: typeof body.token === 'string' && body.token !== '' ? body.token : undefined,
       accountId: body.accountId,
       authorName: typeof body.authorName === 'string' ? body.authorName : '',
-      demoUrl: typeof body.demoUrl === 'string' && body.demoUrl !== '' ? body.demoUrl : undefined,
+      info: info && Object.keys(info).length > 0 ? info : legacyDemo,
     })
     if (!result.ok) return result
     if (result.name !== undefined && result.id !== undefined) {

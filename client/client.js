@@ -5969,6 +5969,9 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 													children: t("groupEmpty")
 												}), members.map((member) => {
 													const mbadge = kindBadge(typeof installedKinds[member] === "string" ? installedKinds[member] : "");
+													const mSpec = String(installed[member] ?? "");
+													const mAct = activations[member];
+													const mToggleable = !(mSpec.startsWith("skill:") || mSpec.startsWith("preset:")) && (effectiveDisabledSet.has(member) || mAct !== void 0 && (mAct.state === "live" || mAct.state === "restart"));
 													return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 														className: Market_module_css_default.groupMember,
 														children: [
@@ -5989,7 +5992,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 																children: " · " + t("patchDisabled")
 															}),
 															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
-															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+															mToggleable && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 																type: "button",
 																role: "switch",
 																"aria-checked": !effectiveDisabledSet.has(member),
@@ -6134,7 +6137,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 								const ghSpec = /^github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:#|$)/.exec(specText);
 								const repoUrl = entry !== void 0 ? entry.url : ghSpec !== null ? "https://github.com/" + ghSpec[1] : null;
 								const off = effectiveDisabledSet.has(name);
-								const toggleable = off || act !== void 0 && (act.state === "live" || act.state === "restart");
+								const toggleable = !(specText.startsWith("skill:") || specText.startsWith("preset:")) && (off || act !== void 0 && (act.state === "live" || act.state === "restart"));
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 									className: missing ? `${Market_module_css_default.irow} ${Market_module_css_default.irowMissing}` : Market_module_css_default.irow,
 									children: [

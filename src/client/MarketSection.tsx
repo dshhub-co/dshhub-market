@@ -3013,6 +3013,12 @@ export function MarketSection(props: MarketSectionProps) {
                                         {members.length === 0 && <div className={css.groupHint}>{t('groupEmpty')}</div>}
                                         {members.map(member => {
                                           const mbadge = kindBadge(typeof installedKinds[member] === 'string' ? installedKinds[member] : '')
+                                          // 与主列表一致：目录包（skill:/preset:）不显示开关，
+                                          // 未在禁用列表且非 live/restart 的行也不显示
+                                          const mSpec = String(installed[member] ?? '')
+                                          const mAct = activations[member]
+                                          const mToggleable = !(mSpec.startsWith('skill:') || mSpec.startsWith('preset:'))
+                                            && (effectiveDisabledSet.has(member) || (mAct !== undefined && (mAct.state === 'live' || mAct.state === 'restart')))
                                           return (
                                           <div className={css.groupMember} key={member}>
                                             <span className={css.nm}>{member}</span>
@@ -3020,6 +3026,7 @@ export function MarketSection(props: MarketSectionProps) {
                                             {effectiveDisabledSet.has(member) && <span className={css.spec}>{t('disabledState')}</span>}
                                             {patchDisabledNames.includes(member) && <span className={css.spec}>{' · ' + t('patchDisabled')}</span>}
                                             <span className={css.grow} />
+                                            {mToggleable && (
                                             <button
                                               type="button"
                                               role="switch"
@@ -3031,6 +3038,7 @@ export function MarketSection(props: MarketSectionProps) {
                                             >
                                               <span className={css.switchKnob} />
                                             </button>
+                                            )}
                                             <Button variant="ghost" size="sm" onClick={() => doRemoveMember(gid, member)}>{t('groupRemove')}</Button>
                                           </div>
                                           )
@@ -3115,8 +3123,12 @@ export function MarketSection(props: MarketSectionProps) {
                             // Switches only where they make sense: everything in
                             // the disable list (to re-enable), plus live/restart
                             // states. inert/broken rows keep their diagnosis
-                            // without a misleading toggle (#60).
-                            const toggleable = off || (act !== undefined && (act.state === 'live' || act.state === 'restart'))
+                            // without a misleading toggle (#60). Directory
+                            // bundles (skill:/preset:) load live by definition
+                            // and the toggle endpoint has no branch for them —
+                            // hiding the switch rather than letting it 400.
+                            const dirBundle = specText.startsWith('skill:') || specText.startsWith('preset:')
+                            const toggleable = !dirBundle && (off || (act !== undefined && (act.state === 'live' || act.state === 'restart')))
                             return (
                               <div key={name} className={missing ? `${css.irow} ${css.irowMissing}` : css.irow}>
                                 <div style={{ minWidth: 0 }}>

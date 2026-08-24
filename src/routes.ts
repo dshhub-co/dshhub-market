@@ -2359,6 +2359,24 @@ export function mountMarketRoutes(
               })
               return
             }
+            // manifest v2: kind=app 应用卸载 = 停进程 + 删 ~/.dsh/apps/<name>。
+            // 与 skill/preset 同理：目录包住在 package state.json 之外，
+            // 必须先于 readInstalled guard 处理，否则一律 400
+            // 「plugin is not installed」。
+            if (isInstalledApp(name)) {
+              const record = readInstalledApps()[name]
+              await stopApp(name) // 幂等：未运行则 no-op，避免 uninstallApp 因运行中而拒绝
+              const removed = uninstallApp(name)
+              logEvent(removed ? 'info' : 'error', 'uninstall',
+                `${name}: app bundle ${removed ? `removed (v${record?.version ?? '?'})` : 'not found'}`)
+              sendJson(response, removed ? 200 : 400, {
+                ok: removed,
+                hot: true,
+                app: record,
+                installed: { ...readInstalled(config.profile, activeProfileDir), ...skillSpecMap(activeProfileDir), ...presetSpecMap(activeProfileDir), ...appSpecMap() },
+              })
+              return
+            }
             if (readInstalled(config.profile, activeProfileDir)[name] === undefined) {
               sendJson(response, 400, { error: 'plugin is not installed' })
               return

@@ -406,6 +406,41 @@ describe('/dsh-market/install app 分支', () => {
   })
 })
 
+describe('/dsh-market/uninstall app 分支', () => {
+  const ZIP = 'https://www.dshhub.co/api/download/p-1'
+
+  it('uninstalls a kind=app: removes ~/.dsh/apps/<name>, returns installed map without it', async () => {
+    stubZipFetch(makeAppZip())
+    await installApp({ name: 'myapp', url: 'https://www.dshhub.co/entry', zip: ZIP } as never)
+    expect(isInstalledApp('myapp')).toBe(true)
+    const routes = mount()
+
+    const res = await hit(routes, '/dsh-market/uninstall', { name: 'myapp' })
+    expect(res.status).toBe(200)
+    const body = res.json() as { ok: boolean; app: { name: string }; installed: Record<string, string> }
+    expect(body.ok).toBe(true)
+    expect(body.app).toMatchObject({ name: 'myapp' })
+    expect(body.installed.myapp).toBeUndefined()
+    expect(isInstalledApp('myapp')).toBe(false)
+    expect(existsSync(appRoot('myapp'))).toBe(false)
+  })
+
+  it('uninstalls a running app by stopping it first (no runtime-guard 400)', async () => {
+    stubZipFetch(makeAppZip())
+    await installApp({ name: 'myapp', url: 'https://www.dshhub.co/entry', zip: ZIP } as never)
+    const routes = mount()
+    const deploy = await hit(routes, '/dsh-market/apps/deploy', { name: 'myapp' })
+    expect(deploy.status).toBe(200)
+    expect((deploy.json() as { ok: boolean }).ok).toBe(true)
+
+    const res = await hit(routes, '/dsh-market/uninstall', { name: 'myapp' })
+    expect(res.status).toBe(200)
+    expect((res.json() as { ok: boolean }).ok).toBe(true)
+    expect(isInstalledApp('myapp')).toBe(false)
+    expect(appStatus('myapp').running).toBe(false)
+  })
+})
+
 describe('/dsh-market/apps/{deploy,stop,status}', () => {
   const ZIP = 'https://www.dshhub.co/api/download/p-1'
 

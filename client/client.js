@@ -7500,24 +7500,19 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 		* DeployPanel 是弹窗本体（状态全在里），DeployFab 是独立浮钮薄壳；
 		* FabBar 把商城与部署合并成一行时直接复用 DeployPanel。
 		*/
-		/** 火箭图标（线性描边，fill=currentColor 风格，随主题变色） */
+		/**
+		* 「运行」播放三角图标（实心，随主题变色）。
+		* 不用火箭——国内用户会把火箭联想起「加速器/安全管家」那一类工具，观感不安全。
+		* 播放键是 IDE 与播放器的通用「运行」符号，中性且语义对（部署 = 启动应用）。
+		*/
 		function DeployIcon({ size = 18 }) {
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
 				width: size,
 				height: size,
 				viewBox: "0 0 24 24",
-				fill: "none",
-				stroke: "currentColor",
-				strokeWidth: "1.8",
-				strokeLinecap: "round",
-				strokeLinejoin: "round",
+				fill: "currentColor",
 				"aria-hidden": "true",
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" })
-				]
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("path", { d: "M7.2 4.72v14.56c0 .82.9 1.33 1.6.9l11.42-7.28a1.06 1.06 0 0 0 0-1.8L8.8 3.82a1.06 1.06 0 0 0-1.6.9z" })
 			});
 		}
 		/** 快捷部署弹窗本体：数据加载、轮询、安装/部署/停止全在这里 */

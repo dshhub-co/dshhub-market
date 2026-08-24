@@ -46,7 +46,7 @@ import {
 } from './market-data.ts'
 import type {
 ActivationInfo, ActivationState, AppRunState, GistExportResult, InstalledMap, InstalledRepoHints, InstalledRepoIdentities, MarketStatus, Registry, RegistryPlugin,
-  SharedHostPackageDependencyFinding, SortDir, SortField, ThemeSnapshot, TimeRange, Translate, UpdateStatus,
+  SharedHostPackageDependencyFinding, SortDir, SortField, ThemeSnapshot, TimeRange, Translate, UnlockedBundle, UnlockedBundleItem, UpdateStatus,
 } from './market-data.ts'
 
 function isHostDependencyFinding(value: unknown): value is SharedHostPackageDependencyFinding {
@@ -92,50 +92,6 @@ const TIER_TAB_KEYS: Record<string, string> = {
   appearance: 'tabAppearance',
   utility: 'tabUtility',
   agentic: 'tabAgentic',
-}
-
-/** 口令解锁（买家侧）：dshhub.co 核销返回的商品条目与解锁记录 */
-interface UnlockedBundleItem {
-  type: 'local' | 'github'
-  pluginId?: string
-  url?: string
-  name?: string
-  kind?: string
-  tier?: string
-  /** 摘要（平台核销时返回，本地插件才有；github 条目走 registry 兜底） */
-  description?: string
-  zip?: string
-  /** 直传条目的 zip 字节 SHA-256（哈希存证，安装时校验防篡改） */
-  sha256?: string
-  /** 条目已被平台下架：核销时返回但标记，卡片显示「已下架」占位 */
-  removed?: boolean
-  removedReason?: string
-  /** kind=app 部署字段（平台 import-github 上架时写入快照，核销时透传） */
-  start?: string
-  build?: string
-  port?: number
-  /** AI 安全审核摘要（含绑定 zip sha256；安装后徽章与后台核验的数据源） */
-  audit?: { level?: string; summary?: string; model?: string; audited_at?: string; sha256?: string }
-}
-
-interface UnlockedBundle {
-  id: string
-  bundleId: string
-  name: string
-  description: string
-  teachingLinks: string
-  originalAuthors: string
-  sellerNote: string
-  tutorialVideo: string
-  gettingStarted: string
-  faq: string
-  supportHours: string
-  updateNote: string
-  contact: string
-  creatorName: string
-  bundleUpdatedAt: string
-  items: UnlockedBundleItem[]
-  redeemedAt: string
 }
 
 /**

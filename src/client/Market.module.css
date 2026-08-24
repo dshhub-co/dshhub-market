@@ -43,6 +43,24 @@
 .fab:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(76,110,255,.45)}
 .fab:active{transform:translateY(0)}
 .fabLabel{font-size:13px;font-weight:600;white-space:nowrap}
+/* 快捷部署入口：商城胶囊上方的小圆形按钮（深色 + 青色描边，与商城渐变区分） */
+.deployFab{position:fixed;left:16px;bottom:120px;z-index:500;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:1px solid rgba(56,189,248,.45);cursor:pointer;color:#e0f2fe;background:rgba(15,23,42,.88);box-shadow:0 6px 18px rgba(8,47,73,.45);transition:transform .15s ease,box-shadow .15s ease}
+.deployFab:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(8,47,73,.6);border-color:rgba(56,189,248,.8)}
+.deployFab:active{transform:translateY(0)}
+/* 快捷部署弹窗：小窗（默认卡片窄，弹窗内列表自排版） */
+.deployModalCard{width:min(440px,92vw)!important;max-width:92vw!important;padding:0!important;overflow:hidden}
+.deployModalHead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb)}
+.deployModalTitle{font-size:15px;font-weight:600}
+.deployModalBody{max-height:min(60vh,520px);overflow:auto;display:block;padding:10px 12px 12px}
+.deployEmpty{padding:26px 12px;text-align:center;color:var(--dsw-alias-text-tertiary,#8b93a7);font-size:13px;line-height:1.7}
+.deployList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.deployItem{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:10px;background:var(--dsw-alias-bg-layer-2,#f7f8fa)}
+.deployItemMain{flex:1;min-width:0;text-align:left;cursor:pointer;background:none;border:none;padding:0;font:inherit;color:inherit}
+.deployItemMain:disabled{cursor:default}
+.deployItemName{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deployItemStatus{display:block;margin-top:3px;font-size:12px;color:var(--dsw-alias-text-tertiary,#8b93a7);display:flex;align-items:center;gap:5px}
+.deployActions{display:flex;gap:6px;flex-shrink:0}
+.deployError{margin-top:8px;font-size:12px;color:#e5484d;word-break:break-all}
 /* 市场面板弹层：加宽（默认卡片窄，长文本显示不全）。headless 卡片自己排版：
    卡片零内边距，标题行 + 纯块级滚动面板（不套 flex，避免挤压 MarketSection
    的网格与卡片 foot 行） */

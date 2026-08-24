@@ -12,6 +12,7 @@ import { InstallToast } from './InstallToast.tsx'
 import { MarketSection } from './MarketSection.tsx'
 import { SettingsCard } from './SettingsCard.tsx'
 import { StoreFab } from './StoreFab.tsx'
+import { DeployFab as DeployFabComp } from './DeployFab.tsx'
 import type { ThemeSnapshot, Translate } from './market-data.ts'
 
 const NS = 'dshhub-market'
@@ -161,4 +162,13 @@ export function apply(ctx: MarketClientContext): void {
     id: 'dshhub-market-fab',
     label: () => 'dshhub-market',
   }, Fab))
+
+  // 商城旁的「快捷部署」入口：小火箭按钮 → 弹窗列出已解锁的 kind=app 应用，
+  // 一键安装/部署/停止/打开（复用 /dsh-market/apps/* 路由）。
+  const DeployFab = () => h(DeployFabComp, { t })
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'dshhub-market-deploy',
+    label: () => 'dshhub-market',
+  }, DeployFab))
 }

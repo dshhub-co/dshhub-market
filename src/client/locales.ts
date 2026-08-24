@@ -3,7 +3,6 @@
 export const zh = {
   nav: 'dshhub.co 市场',
   fabTitle: '打开 dshhub.co 插件市场',
-  fabLabel: 'dshhub.co 插件市场',
   fabModalTitle: 'dshhub.co 插件市场',
   setCardDesc: '查看版本、更新或移除插件市场。',
   setSelfUpToDate: '已是最新版本',
@@ -118,6 +117,7 @@ export const zh = {
   deployInstalled: '已安装',
   deployInstallBtn: '安装并部署',
   deployWorking: '处理中…',
+  deployClose: '关闭',
   teachingLabel: '使用指南',
   byAuthor: '由 {0} 提供',
   videoLabel: '教程视频',
@@ -423,7 +423,6 @@ export type MarketKey = keyof typeof zh
 export const en: Record<MarketKey, string> = {
   nav: 'dshhub.co Market',
   fabTitle: 'Open dshhub.co plugin market',
-  fabLabel: 'dshhub.co Plugin Market',
   fabModalTitle: 'dshhub.co Plugin Market',
   setCardDesc: 'See the version, update, or remove the plugin market.',
   setSelfUpToDate: 'Up to date',
@@ -536,6 +535,7 @@ export const en: Record<MarketKey, string> = {
   deployInstalled: 'Installed',
   deployInstallBtn: 'Install & Deploy',
   deployWorking: 'Working…',
+  deployClose: 'Close',
   teachingLabel: 'Guides',
   byAuthor: 'Provided by {0}',
   videoLabel: 'Tutorial video',

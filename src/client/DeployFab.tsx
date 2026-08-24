@@ -1,12 +1,14 @@
 /**
- * 商城入口旁的「快捷部署」小按钮（shell.overlay）：火箭图标悬浮在商城
- * 胶囊上方。点击弹出小窗，列出已解锁的 kind=app 应用——数据来自
- * /dsh-market/unlocked（口令解锁记录展平）+ /dsh-market/installed
- * （已安装判断）+ /dsh-market/apps/status（运行态轮询）。
+ * 「快捷部署」入口（shell.overlay）：火箭图标按钮 → 弹出小窗，列出已解锁的
+ * kind=app 应用——数据来自 /dsh-market/unlocked（口令解锁记录展平）+
+ * /dsh-market/installed（已安装判断）+ /dsh-market/apps/status（运行态轮询）。
  *
- * 交互：未安装 → 点条目或「安装并部署」（装完自动起服务，浏览器新标签
- * 打开）；已安装未运行 → 「部署」；运行中 → 「打开」/「停止」。与解锁卡
- * 内的 app 按钮同一套后端路由，只是少了一步翻页找卡片。
+ * 交互：未安装 → 点条目或「安装并部署」（装完自动起服务，浏览器新标签打开）；
+ * 已安装未运行 → 「部署」；运行中 → 「打开」/「停止」。与解锁卡内的 app 按钮
+ * 同一套后端路由，只是少了一步翻页找卡片。
+ *
+ * DeployPanel 是弹窗本体（状态全在里），DeployFab 是独立浮钮薄壳；
+ * FabBar 把商城与部署合并成一行时直接复用 DeployPanel。
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Button, IconCloseOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -18,7 +20,7 @@ export interface DeployFabDeps {
 }
 
 /** 火箭图标（线性描边，fill=currentColor 风格，随主题变色） */
-function DeployIcon({ size = 18 }: { size?: number }) {
+export function DeployIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
@@ -36,8 +38,14 @@ interface DeployableApp {
   bundleName: string
 }
 
-export function DeployFab({ t }: DeployFabDeps) {
-  const [open, setOpen] = useState(false)
+export interface DeployPanelDeps {
+  t: Translate
+  /** 关闭回调（弹窗的关闭按钮与遮罩点击都走这里） */
+  onClose(): void
+}
+
+/** 快捷部署弹窗本体：数据加载、轮询、安装/部署/停止全在这里 */
+export function DeployPanel({ t, onClose }: DeployPanelDeps) {
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [apps, setApps] = useState<DeployableApp[]>([])
@@ -76,12 +84,11 @@ export function DeployFab({ t }: DeployFabDeps) {
   }, [])
 
   useEffect(() => {
-    if (!open) return
     setLoading(true)
     void refresh().finally(() => setLoading(false))
     const timer = setInterval(() => { void refresh() }, 10_000)
     return () => clearInterval(timer)
-  }, [open, refresh])
+  }, [refresh])
 
   /** 部署（已安装、未运行）：起服务 + 浏览器新标签打开（用户手势内 window.open） */
   const doDeploy = useCallback((app: DeployableApp) => {
@@ -182,6 +189,106 @@ export function DeployFab({ t }: DeployFabDeps) {
   }
 
   return (
+    <Modal
+      open
+      onClose={onClose}
+      title={t('deployFabTitle')}
+      closeLabel={t('deployFabTitle')}
+      headless
+      className={css.deployModalCard}
+    >
+      <div className={css.deployModalHead}>
+        <span className={css.deployModalTitle}>{t('deployFabTitle')}</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<IconCloseOutline16 size={16} />}
+          aria-label={t('deployClose')}
+          onClick={onClose}
+        />
+      </div>
+      <div className={css.deployModalBody}>
+        {loading && apps.length === 0 ? (
+          <div className={css.deployEmpty}>{t('deployLoading')}</div>
+        ) : loadError !== null ? (
+          <div className={css.deployEmpty}>{loadError}</div>
+        ) : apps.length === 0 ? (
+          <div className={css.deployEmpty}>{t('deployEmpty')}</div>
+        ) : (
+          <ul className={css.deployList}>
+            {apps.map(app => (
+              <li key={app.key} className={css.deployItem}>
+                <button
+                  type="button"
+                  className={css.deployItemMain}
+                  title={t('deployFabTitle')}
+                  disabled={isBusy(app)}
+                  onClick={() => act(app)}
+                >
+                  <span className={css.deployItemName}>
+                    {app.item.type === 'github' ? '🐙 ' : '📦 '}{app.item.name ?? app.item.url}
+                    <span className={`${css.kindBadge} ${css.kindBadgeApp}`}>{t('kindApp')}</span>
+                  </span>
+                  <span className={css.deployItemStatus}>
+                    {running(app) ? (
+                      <>
+                        <span className={css.appRunningDot} />
+                        {t('appRunning').replace('{0}', String(appRuns[app.item.name ?? '']?.port ?? ''))}
+                      </>
+                    ) : installed[app.item.name ?? ''] !== undefined
+                      ? t('deployInstalled')
+                      : t('deployNotInstalled')}
+                  </span>
+                </button>
+                <div className={css.deployActions}>
+                  {running(app) ? (
+                    <>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={isBusy(app)}
+                        onClick={() => {
+                          const url = appRuns[app.item.name ?? '']?.url
+                          if (typeof url === 'string' && url !== '') window.open(url, '_blank', 'noopener')
+                        }}
+                      >{t('appOpen')}</Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isBusy(app)}
+                        onClick={() => doStop(app)}
+                      >{isBusy(app) ? t('appStopping') : t('appStop')}</Button>
+                    </>
+                  ) : installed[app.item.name ?? ''] !== undefined ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={isBusy(app)}
+                      onClick={() => doDeploy(app)}
+                    >{isBusy(app) ? t('appDeploying') : t('appDeploy')}</Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={isBusy(app)}
+                      onClick={() => doInstall(app)}
+                    >{isBusy(app) ? t('deployWorking') : t('deployInstallBtn')}</Button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {error !== null && <div className={css.deployError}>{error}</div>}
+      </div>
+    </Modal>
+  )
+}
+
+/** 独立浮钮薄壳：火箭小圆钮 → 打开 DeployPanel（FabBar 合并版不再用它） */
+export function DeployFab({ t }: DeployFabDeps) {
+  const [open, setOpen] = useState(false)
+  return (
     <>
       <button
         className={css.deployFab}
@@ -191,101 +298,7 @@ export function DeployFab({ t }: DeployFabDeps) {
       >
         <DeployIcon />
       </button>
-      {open && (
-        <Modal
-          open
-          onClose={() => setOpen(false)}
-          title={t('deployFabTitle')}
-          closeLabel={t('deployFabTitle')}
-          headless
-          className={css.deployModalCard}
-        >
-          <div className={css.deployModalHead}>
-            <span className={css.deployModalTitle}>{t('deployFabTitle')}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<IconCloseOutline16 size={16} />}
-              aria-label={t('deployFabTitle')}
-              onClick={() => setOpen(false)}
-            />
-          </div>
-          <div className={css.deployModalBody}>
-            {loading && apps.length === 0 ? (
-              <div className={css.deployEmpty}>{t('deployLoading')}</div>
-            ) : loadError !== null ? (
-              <div className={css.deployEmpty}>{loadError}</div>
-            ) : apps.length === 0 ? (
-              <div className={css.deployEmpty}>{t('deployEmpty')}</div>
-            ) : (
-              <ul className={css.deployList}>
-                {apps.map(app => (
-                  <li key={app.key} className={css.deployItem}>
-                    <button
-                      type="button"
-                      className={css.deployItemMain}
-                      title={t('deployFabTitle')}
-                      disabled={isBusy(app)}
-                      onClick={() => act(app)}
-                    >
-                      <span className={css.deployItemName}>
-                        {app.item.type === 'github' ? '🐙 ' : '📦 '}{app.item.name ?? app.item.url}
-                        <span className={`${css.kindBadge} ${css.kindBadgeApp}`}>{t('kindApp')}</span>
-                      </span>
-                      <span className={css.deployItemStatus}>
-                        {running(app) ? (
-                          <>
-                            <span className={css.appRunningDot} />
-                            {t('appRunning').replace('{0}', String(appRuns[app.item.name ?? '']?.port ?? ''))}
-                          </>
-                        ) : installed[app.item.name ?? ''] !== undefined
-                          ? t('deployInstalled')
-                          : t('deployNotInstalled')}
-                      </span>
-                    </button>
-                    <div className={css.deployActions}>
-                      {running(app) ? (
-                        <>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            disabled={isBusy(app)}
-                            onClick={() => {
-                              const url = appRuns[app.item.name ?? '']?.url
-                              if (typeof url === 'string' && url !== '') window.open(url, '_blank', 'noopener')
-                            }}
-                          >{t('appOpen')}</Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isBusy(app)}
-                            onClick={() => doStop(app)}
-                          >{isBusy(app) ? t('appStopping') : t('appStop')}</Button>
-                        </>
-                      ) : installed[app.item.name ?? ''] !== undefined ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={isBusy(app)}
-                          onClick={() => doDeploy(app)}
-                        >{isBusy(app) ? t('appDeploying') : t('appDeploy')}</Button>
-                      ) : (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={isBusy(app)}
-                          onClick={() => doInstall(app)}
-                        >{isBusy(app) ? t('deployWorking') : t('deployInstallBtn')}</Button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {error !== null && <div className={css.deployError}>{error}</div>}
-          </div>
-        </Modal>
-      )}
+      {open && <DeployPanel t={t} onClose={() => setOpen(false)} />}
     </>
   )
 }

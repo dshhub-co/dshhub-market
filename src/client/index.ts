@@ -11,8 +11,7 @@ import { en, zh } from './locales.ts'
 import { InstallToast } from './InstallToast.tsx'
 import { MarketSection } from './MarketSection.tsx'
 import { SettingsCard } from './SettingsCard.tsx'
-import { StoreFab } from './StoreFab.tsx'
-import { DeployFab as DeployFabComp } from './DeployFab.tsx'
+import { FabBar } from './FabBar.tsx'
 import type { ThemeSnapshot, Translate } from './market-data.ts'
 
 const NS = 'dshhub-market'
@@ -154,21 +153,12 @@ export function apply(ctx: MarketClientContext): void {
     label: () => 'dshhub-market',
   }, Toast))
 
-  // 右下角商城入口：悬浮按钮，点击打开内嵌市场面板。
+  // 左下角轻量入口：单行细胶囊 = 商城（内嵌市场面板）+ 快捷部署（DeployPanel）。
   // shell.overlay 是列表槽（additive、click-through），专用于浮在应用之上的自有表面。
-  const Fab = () => h(StoreFab, { t, market: marketDeps })
+  const Bar = () => h(FabBar, { t, market: marketDeps })
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'dshhub-market-fab',
     label: () => 'dshhub-market',
-  }, Fab))
-
-  // 商城旁的「快捷部署」入口：小火箭按钮 → 弹窗列出已解锁的 kind=app 应用，
-  // 一键安装/部署/停止/打开（复用 /dsh-market/apps/* 路由）。
-  const DeployFab = () => h(DeployFabComp, { t })
-  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
-    name: 'shell.overlay',
-    id: 'dshhub-market-deploy',
-    label: () => 'dshhub-market',
-  }, DeployFab))
+  }, Bar))
 }

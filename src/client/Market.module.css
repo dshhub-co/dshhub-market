@@ -37,13 +37,15 @@
    ::before paints that strip in the same background and inherits the row's
    z-index, so the row covers what it cannot reach. Fixing it by removing the
    scroller's padding would re-space all five tabs to repair one. */
-/* 左下角插件市场入口（shell.overlay 悬浮胶囊，位于侧边栏设置按钮上方；
-   z-index 低于宿主弹层，设置对话框打开时会被遮住） */
-.fab{position:fixed;left:16px;bottom:72px;z-index:500;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#fff;background:linear-gradient(135deg,#4f7cff,#7c3aed);box-shadow:0 6px 18px rgba(76,110,255,.35);transition:transform .15s ease,box-shadow .15s ease}
-.fab:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(76,110,255,.45)}
-.fab:active{transform:translateY(0)}
-.fabLabel{font-size:13px;font-weight:600;white-space:nowrap}
-/* 快捷部署入口：商城胶囊上方的小圆形按钮（深色 + 青色描边，与商城渐变区分） */
+/* 左下角轻量入口（shell.overlay）：单行细胶囊 = 商城 + 快捷部署两个小图标。
+   半透明深色 + 毛玻璃 + 发丝边框，无文字不抢眼，位于侧边栏设置按钮上方；
+   z-index 低于宿主弹层，设置对话框打开时会被遮住 */
+.fabBar{position:fixed;left:16px;bottom:72px;z-index:500;display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;border:1px solid rgba(148,163,184,.22);background:rgba(15,23,42,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 4px 16px rgba(2,6,23,.22)}
+.fabBarBtn{width:28px;height:28px;border-radius:50%;border:none;background:transparent;color:rgba(203,213,225,.85);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease,color .15s ease,transform .1s ease}
+.fabBarBtn:hover{background:rgba(148,163,184,.16);color:#fff}
+.fabBarBtn:active{transform:scale(.93)}
+.fabBarDivider{width:1px;height:14px;background:rgba(148,163,184,.28);margin:0 3px}
+/* 快捷部署独立浮钮（仅测试薄壳用；线上由 FabBar 单行胶囊承载） */
 .deployFab{position:fixed;left:16px;bottom:120px;z-index:500;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:1px solid rgba(56,189,248,.45);cursor:pointer;color:#e0f2fe;background:rgba(15,23,42,.88);box-shadow:0 6px 18px rgba(8,47,73,.45);transition:transform .15s ease,box-shadow .15s ease}
 .deployFab:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(8,47,73,.6);border-color:rgba(56,189,248,.8)}
 .deployFab:active{transform:translateY(0)}

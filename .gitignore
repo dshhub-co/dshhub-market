@@ -5,3 +5,9 @@ coverage/
 .DS_Store
 .idea/
 data/readmes-snapshot.json
+
+# 本地凭据与构建产物(1.0 搁置后保留)
+.env
+.vercel/
+dist-electron/
+release/

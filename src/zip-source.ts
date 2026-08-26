@@ -172,10 +172,14 @@ export async function zipKind(url: string): Promise<string | null> {
  * `opts.token` — dshhub session access token (paid-marketplace-design.md
  * §4.3 方式 B): passed as `Authorization: Bearer` so the download endpoint
  * can verify the License for paid entries. Free entries ignore it.
+ *
+ * `opts.expectedSha256` — 哈希存证：平台直传条目在 registry 携带
+ * file_sha256（checksum），下载字节比对不一致即拒绝安装（防下载被篡改）；
+ * GitHub 导入条目字节实时重建不稳定、不携带，传 undefined 跳过校验。
  */
 export async function materializeTgz(
   entry: RegistryPlugin,
-  opts?: { token?: string },
+  opts?: { token?: string; expectedSha256?: string },
 ): Promise<string> {
   const zipUrl = entry.zip as string
   let zipBytes: Buffer
@@ -194,6 +198,13 @@ export async function materializeTgz(
   }
   if (zipBytes.byteLength < 22) throw new Error('插件包无效（空文件）')
 
+  // 哈希存证校验：与 registry/redeem 下发的 file_sha256 比对，防篡改。
+  // 与下面缓存命名共用同一份 sha256 结果，多一次下载不重复算。
+  const zipSha256 = createHash('sha256').update(zipBytes).digest('hex')
+  if (opts?.expectedSha256 && zipSha256 !== opts.expectedSha256) {
+    throw new Error('插件包内容校验失败（哈希不符），可能下载被篡改，已拒绝安装')
+  }
+
   const entries = unzipSync(new Uint8Array(zipBytes))
   const { manifest, rooted } = locateManifest(entries)
   if (typeof manifest.id !== 'string' || manifest.id === '' || typeof manifest.name !== 'string' || manifest.name === '' || typeof manifest.version !== 'string') {
@@ -203,7 +214,7 @@ export async function materializeTgz(
   const tgz = entriesToTgz(withPkg)
 
   const safeId = manifest.id.replace(/[^a-zA-Z0-9._-]/g, '-')
-  const hash = createHash('sha256').update(zipBytes).digest('hex').slice(0, 8)
+  const hash = zipSha256.slice(0, 8)
   mkdirSync(CACHE_DIR, { recursive: true })
   const tgzPath = join(CACHE_DIR, `${safeId}-${hash}.tgz`)
   if (!existsSync(tgzPath)) writeFileSync(tgzPath, tgz)

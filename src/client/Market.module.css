@@ -37,12 +37,32 @@
    ::before paints that strip in the same background and inherits the row's
    z-index, so the row covers what it cannot reach. Fixing it by removing the
    scroller's padding would re-space all five tabs to repair one. */
-/* 左下角插件市场入口（shell.overlay 悬浮胶囊，位于侧边栏设置按钮上方；
-   z-index 低于宿主弹层，设置对话框打开时会被遮住） */
-.fab{position:fixed;left:16px;bottom:72px;z-index:500;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#fff;background:linear-gradient(135deg,#4f7cff,#7c3aed);box-shadow:0 6px 18px rgba(76,110,255,.35);transition:transform .15s ease,box-shadow .15s ease}
-.fab:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(76,110,255,.45)}
-.fab:active{transform:translateY(0)}
-.fabLabel{font-size:13px;font-weight:600;white-space:nowrap}
+/* 左下角轻量入口（shell.overlay）：单行细胶囊 = 商城 + 快捷部署两个小图标。
+   半透明深色 + 毛玻璃 + 发丝边框，无文字不抢眼，位于侧边栏设置按钮上方；
+   z-index 低于宿主弹层，设置对话框打开时会被遮住 */
+.fabBar{position:fixed;left:16px;bottom:72px;z-index:500;display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;border:1px solid rgba(148,163,184,.22);background:rgba(15,23,42,.6);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 4px 16px rgba(2,6,23,.22)}
+.fabBarBtn{width:28px;height:28px;border-radius:50%;border:none;background:transparent;color:rgba(203,213,225,.85);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease,color .15s ease,transform .1s ease}
+.fabBarBtn:hover{background:rgba(148,163,184,.16);color:#fff}
+.fabBarBtn:active{transform:scale(.93)}
+.fabBarDivider{width:1px;height:14px;background:rgba(148,163,184,.28);margin:0 3px}
+/* 快捷部署独立浮钮（仅测试薄壳用；线上由 FabBar 单行胶囊承载） */
+.deployFab{position:fixed;left:16px;bottom:120px;z-index:500;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:1px solid rgba(56,189,248,.45);cursor:pointer;color:#e0f2fe;background:rgba(15,23,42,.88);box-shadow:0 6px 18px rgba(8,47,73,.45);transition:transform .15s ease,box-shadow .15s ease}
+.deployFab:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(8,47,73,.6);border-color:rgba(56,189,248,.8)}
+.deployFab:active{transform:translateY(0)}
+/* 快捷部署弹窗：小窗（默认卡片窄，弹窗内列表自排版） */
+.deployModalCard{width:min(440px,92vw)!important;max-width:92vw!important;padding:0!important;overflow:hidden}
+.deployModalHead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb)}
+.deployModalTitle{font-size:15px;font-weight:600}
+.deployModalBody{max-height:min(60vh,520px);overflow:auto;display:block;padding:10px 12px 12px}
+.deployEmpty{padding:26px 12px;text-align:center;color:var(--dsw-alias-text-tertiary,#8b93a7);font-size:13px;line-height:1.7}
+.deployList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.deployItem{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:10px;background:var(--dsw-alias-bg-layer-2,#f7f8fa)}
+.deployItemMain{flex:1;min-width:0;text-align:left;cursor:pointer;background:none;border:none;padding:0;font:inherit;color:inherit}
+.deployItemMain:disabled{cursor:default}
+.deployItemName{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deployItemStatus{display:block;margin-top:3px;font-size:12px;color:var(--dsw-alias-text-tertiary,#8b93a7);display:flex;align-items:center;gap:5px}
+.deployActions{display:flex;gap:6px;flex-shrink:0}
+.deployError{margin-top:8px;font-size:12px;color:#e5484d;word-break:break-all}
 /* 市场面板弹层：加宽（默认卡片窄，长文本显示不全）。headless 卡片自己排版：
    卡片零内边距，标题行 + 纯块级滚动面板（不套 flex，避免挤压 MarketSection
    的网格与卡片 foot 行） */
@@ -337,6 +357,25 @@
 .unlockedItemLink:hover{text-decoration:underline}
 .unlockedItemDesc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280);margin-left:24px;display:block}
 .unlockedInstalled{font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,#16a34a)}
+/* ---- 条目被平台下架：整行弱化 + 红色占位 + 原因（解锁卡） ---- */
+.removedBadge{font-size:12px;line-height:18px;color:#e5484d;border:1px solid rgba(229,72,77,.4);background:rgba(229,72,77,.08);border-radius:999px;padding:1px 8px;white-space:nowrap;flex-shrink:0;display:inline-block}
+.removedItem{opacity:.72}
+.removedItemReason{font-size:12px;line-height:18px;color:#e5484d;margin-left:24px;display:block}
+
+/* ---- 插件端举报/评分：入口小链接 + 对话框表单（背景不写死，跟随宿主主题） ---- */
+.unlockedActions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.actLink{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#9ca3af);cursor:pointer;white-space:nowrap;flex-shrink:0;user-select:none}
+.actLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7);text-decoration:underline}
+.fbField{margin-bottom:10px}
+.fbField label{display:block;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#9ca3af);margin-bottom:4px}
+.fbSelect,.fbInput,.fbTextarea{width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:6px;color:inherit}
+.fbTextarea{resize:vertical;font-family:inherit}
+.fbOk{font-size:12px;line-height:18px;color:var(--dsw-alias-state-success-primary,#16a34a);margin:8px 0 0}
+.fbError{font-size:12px;line-height:18px;color:#e5484d;margin:8px 0 0}
+.rateStars{display:flex;align-items:center;gap:2px}
+.rateStar{background:none;border:none;padding:2px;font-size:20px;line-height:1;color:#d1d5db;cursor:pointer}
+.rateStarOn{color:var(--dsw-alias-brand-warning,#f59e0b)}
+.rateNote{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#9ca3af);margin-left:8px}
 
 /* ---- kind 彩色标签（皮肤/插件/工具/技能/Agent 模式，解锁卡 + 已安装页共用） ---- */
 .kindBadge{font-size:11px;line-height:16px;border-radius:999px;padding:1px 8px;white-space:nowrap;flex-shrink:0;display:inline-block;vertical-align:2px}
@@ -345,6 +384,15 @@
 .kindBadgeTool{color:#d97706;background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.32)}
 .kindBadgeSkill{color:#16a34a;background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.32)}
 .kindBadgePreset{color:#7c3aed;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.32)}
+.kindBadgeApp{color:#0ea5e9;background:rgba(14,165,233,.10);border:1px solid rgba(14,165,233,.32)}
+/* ---- AI 审核徽章（kind=app 解锁卡；pass 绿 / warn 黄，hover 看结论） ---- */
+.auditBadgePass{color:#16a34a;background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.32)}
+.auditBadgeWarn{color:#d97706;background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.32)}
+/* ---- kind=app 运行态（部署/停止/打开 + 呼吸灯） ---- */
+.appRunning{font-size:12px;color:#16a34a;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.appRunningDot{width:7px;height:7px;border-radius:50%;background:#16a34a;display:inline-block;animation:appPulse 1.6s ease-in-out infinite}
+@keyframes appPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.appError{font-size:12px;color:#ef4444;display:block;margin-top:4px;max-width:340px}
 
 /* ---- 解锁卡片 v2（买家体验：去商业味、有人味） ---- */
 .unlockedBy{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280)}

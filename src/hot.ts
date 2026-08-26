@@ -251,6 +251,24 @@ export interface UnlockedBundleItem {
   /** 摘要（平台核销时返回，本地插件才有；github 条目走 registry 兜底） */
   description?: string
   zip?: string
+  /** 平台已下架标记：该条目不可再安装（解锁卡片显示占位） */
+  removed?: boolean
+  /** 下架原因（removed 时平台带回） */
+  removedReason?: string
+  /** 直传链路 zip 的 SHA-256（哈希存证），安装时校验 */
+  sha256?: string
+  /** kind=app 部署字段（平台 import-github 上架时写入快照，核销时透传） */
+  start?: string
+  build?: string
+  port?: number
+  /** AI 安全审核摘要（含绑定的 zip sha256；客户端安装时核验并展示徽章） */
+  audit?: {
+    level?: string
+    summary?: string
+    model?: string
+    audited_at?: string
+    sha256?: string
+  }
 }
 
 export interface UnlockedBundleRecord {

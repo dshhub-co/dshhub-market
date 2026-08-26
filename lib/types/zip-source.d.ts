@@ -23,7 +23,12 @@ export declare function zipKind(url: string): Promise<string | null>;
  * `opts.token` — dshhub session access token (paid-marketplace-design.md
  * §4.3 方式 B): passed as `Authorization: Bearer` so the download endpoint
  * can verify the License for paid entries. Free entries ignore it.
+ *
+ * `opts.expectedSha256` — 哈希存证：平台直传条目在 registry 携带
+ * file_sha256（checksum），下载字节比对不一致即拒绝安装（防下载被篡改）；
+ * GitHub 导入条目字节实时重建不稳定、不携带，传 undefined 跳过校验。
  */
 export declare function materializeTgz(entry: RegistryPlugin, opts?: {
     token?: string;
+    expectedSha256?: string;
 }): Promise<string>;

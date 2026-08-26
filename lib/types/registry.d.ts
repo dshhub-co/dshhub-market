@@ -55,6 +55,13 @@ export interface RegistryPlugin {
     price?: number;
     /** fork (dshhub): price currency (default CNY). */
     paidCurrency?: string;
+    /**
+     * fork (dshhub): SHA-256 of the hosted zip bytes, present only on
+     * client-uploaded (zip-only) entries. The zip install path verifies the
+     * downloaded bytes against it; GitHub-imported entries omit it (their
+     * bytes are rebuilt live from the repo and are not stable).
+     */
+    checksum?: string;
 }
 export interface Registry {
     updated: string;

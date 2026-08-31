@@ -18,6 +18,14 @@ export interface ScannedItem {
     displayName: string;
     description: string;
     path: string;
+    /**
+     * 来源指纹（2026-08-31）：
+     *   user   = 用户自创（无市场安装状态文件）→ 可上架
+     *   market = 从市场下载安装（存在 .dshhub/<name>.json 状态记录）→ 禁止再上架，
+     *            防止「市场下的东西换个名重新上架」洗版。
+     * 旧客户端不返回该字段 → 前端按 user 兼容处理。
+     */
+    installSource?: 'user' | 'market';
 }
 /**
  * Scan preset roots for preset directories (each containing agent.cordis.yml).

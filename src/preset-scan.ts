@@ -23,13 +23,28 @@ export interface ScannedItem {
   displayName: string
   description: string
   path: string
+  /**
+   * 来源指纹（2026-08-31）：
+   *   user   = 用户自创（无市场安装状态文件）→ 可上架
+   *   market = 从市场下载安装（存在 .dshhub/<name>.json 状态记录）→ 禁止再上架，
+   *            防止「市场下的东西换个名重新上架」洗版。
+   * 旧客户端不返回该字段 → 前端按 user 兼容处理。
+   */
+  installSource?: 'user' | 'market'
 }
 
 const PRESET_YML = 'agent.cordis.yml'
 const PRESET_META = 'preset.yml'
 const SKILL_MD = 'SKILL.md'
+/** 市场安装的状态目录：preset 在 <preset-root>/.dshhub/，skill 在 ~/.dsh/skills/.dshhub/ */
+const INSTALL_STATE_DIR = '.dshhub'
 /** Hidden state dirs that should never be scanned as publishable content. */
 const SKIP_DIRS = new Set(['.dshhub', '.git', 'node_modules', '__MACOSX'])
+
+/** 来源指纹：对应状态文件存在 = 市场安装过（无论之后是否改过内容，一律视为市场来源） */
+function installStateExists(stateDir: string, name: string): boolean {
+  return existsSync(join(stateDir, `${name}.json`))
+}
 
 function isDir(path: string): boolean {
   try {
@@ -100,6 +115,7 @@ export function scanPresets(profileDirectory: string): ScannedItem[] {
         displayName: meta.name ?? name,
         description: meta.description ?? '',
         path: dir,
+        installSource: installStateExists(join(root, INSTALL_STATE_DIR), name) ? 'market' : 'user',
       })
     }
   }
@@ -174,6 +190,7 @@ export function scanSkills(profileDirectory: string): ScannedItem[] {
         displayName,
         description,
         path: dir,
+        installSource: installStateExists(join(dshHome(), 'skills', INSTALL_STATE_DIR), name) ? 'market' : 'user',
       })
     }
   }

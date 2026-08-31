@@ -17,6 +17,16 @@
  * platform marks a session offline after 15 min without one) → execute
  * tasks → report results. On 403 (secret invalidated) re-register.
  */
+/**
+ * 把本机桥接会话绑定到 dshhub 账号（配对码方案，0.8.47）：
+ * 遍历本机各 profile 的桥接状态文件，用网页端生成的 6 位配对码调用
+ * /api/bridge/bind 绑定。一次绑定永久生效——之后会话列表/任务派发按账号
+ * 隔离，不再依赖 IP（代理/VPN 无影响）。
+ */
+export declare function bindToAccount(code: string): Promise<{
+    ok: boolean;
+    error?: string;
+}>;
 interface BridgeState {
     sessionId: string;
     secret: string;

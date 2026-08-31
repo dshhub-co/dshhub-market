@@ -36,6 +36,7 @@ import type { ReactElement } from 'react'
 import { Button, IconChevronDownOutline14, IconLoadingOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './Market.module.css'
 import type { Translate } from './market-data.ts'
+import { bindToAccount } from '../cloud-bridge.ts'
 
 /** Keys the market leaves in the browser; cleared when the user purges. */
 const BROWSER_KEYS = ['dshm-webdav', 'dshm-gist-id'] as const
@@ -136,6 +137,28 @@ export function SettingsCard({ t, onRemoved }: SettingsCardProps): ReactElement 
   const [phase, setPhase] = useState<Phase>('idle')
   const [purge, setPurge] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 绑定 dshhub 账号（配对码，0.8.47）
+  const [bindCode, setBindCode] = useState('')
+  const [binding, setBinding] = useState(false)
+  const [bound, setBound] = useState<string | null>(null)
+
+  const onBind = useCallback(async () => {
+    setBinding(true)
+    setBound(null)
+    setError(null)
+    try {
+      const r = await bindToAccount(bindCode)
+      if (r.ok) {
+        setBound('已绑定 ✓ 现在回到 dshhub.co 发布页，本机 DSH 会直接显示已连接')
+        setBindCode('')
+      } else {
+        setBound(null)
+        setError(r.error ?? '绑定失败')
+      }
+    } finally {
+      setBinding(false)
+    }
+  }, [bindCode])
 
   // Only once the row is opened: the plugin configuration page renders every
   // card at once, and an update check costs a registry round trip.
@@ -301,6 +324,20 @@ export function SettingsCard({ t, onRemoved }: SettingsCardProps): ReactElement 
               title: id === 'dev' ? t('setChannelDevHint') : undefined,
               onClick: () => { onChannel(id) },
             }, t(CHANNEL_LABEL[id]))),
+          )),
+        row('绑定 dshhub 账号（本机扫描用）',
+          bound ?? '在 dshhub.co 发布页点「生成配对码」，把 6 位码填到这里，一次绑定永久生效（不再受代理/IP 影响）',
+          h('div', { className: css.setSeg },
+            h('input', {
+              type: 'text',
+              value: bindCode,
+              maxLength: 6,
+              placeholder: '6 位配对码',
+              onChange: (e: { target: { value: string } }) => setBindCode(e.target.value.replace(/\D/g, '').slice(0, 6)),
+              style: { width: 110, marginRight: 6, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(148,163,184,.35)', background: 'transparent', color: 'inherit' },
+            }),
+            h(Button, { variant: 'primary', size: 'sm', disabled: binding || bindCode.length !== 6, onClick: onBind },
+              binding ? h(IconLoadingOutline16, { size: 14 }) : '绑定'),
           )),
         row(t('setSelfRemove'), t('setSelfRemoveHint'),
           phase === 'confirming' || busy

@@ -36,7 +36,9 @@ import type { ReactElement } from 'react'
 import { Button, IconChevronDownOutline14, IconLoadingOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './Market.module.css'
 import type { Translate } from './market-data.ts'
-import { bindToAccount } from '../cloud-bridge.ts'
+// 注意：客户端 UI 绝不能 import Node 端模块（cloud-bridge 等），否则
+// node:* 内置模块会混进 browser bundle 导致 DSH 加载崩溃（0.8.47 事故）。
+// 绑定走宿主路由 /dsh-market/bind-account（Node 端执行）。
 
 /** Keys the market leaves in the browser; cleared when the user purges. */
 const BROWSER_KEYS = ['dshm-webdav', 'dshm-gist-id'] as const
@@ -147,14 +149,23 @@ export function SettingsCard({ t, onRemoved }: SettingsCardProps): ReactElement 
     setBound(null)
     setError(null)
     try {
-      const r = await bindToAccount(bindCode)
-      if (r.ok) {
+      // 经宿主路由执行（Node 端读本机桥接状态并调用平台绑定）
+      const res = await fetch('/dsh-market/bind-account', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: bindCode }),
+      })
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (res.ok && d.ok) {
         setBound('已绑定 ✓ 现在回到 dshhub.co 发布页，本机 DSH 会直接显示已连接')
         setBindCode('')
       } else {
         setBound(null)
-        setError(r.error ?? '绑定失败')
+        setError(d.error ?? `HTTP ${res.status}`)
       }
+    } catch (e) {
+      setBound(null)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBinding(false)
     }

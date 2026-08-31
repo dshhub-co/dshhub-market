@@ -75,6 +75,7 @@ import { checkUpdates, fetchNpmLatest, invalidateUpdates, isLocalPathSpec, isUpg
 import { FORK_SELF_NAME, fetchOwnVersion, selfUpdateTarget, updateBase } from './self-update.ts'
 import { createThemeManager, type LoaderEntry } from './themes.ts'
 import { readJsonBody, sameOrigin, sendJson } from './http.ts'
+import { bindToAccount } from './cloud-bridge.ts'
 import { restartAllowed, scheduleRestart, servingPort, trustedRestartRequest, trustedDownloadRequest } from './restart.ts'
 import { activationAfterReplace, hasHostHalf, verifyActivation } from './verify.ts'
 import {
@@ -655,6 +656,31 @@ export function mountMarketRoutes(
           const message = error instanceof Error ? error.message : String(error)
           logEvent('error', 'publish', `route error: ${message}`)
           sendJson(response, 500, { error: message })
+        }
+      },
+    }),
+
+    // ---- 绑定 dshhub 账号（配对码；Node 端读桥接状态并调平台，浏览器 UI 只发命令） ----
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/bind-account',
+      handler: async (request, response) => {
+        if (request.method !== 'POST') {
+          response.writeHead(405, { allow: 'POST' })
+          response.end()
+          return
+        }
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'untrusted origin' })
+          return
+        }
+        try {
+          const body = (await readJsonBody(request)) as { code?: unknown }
+          const code = typeof body.code === 'string' ? body.code.trim() : ''
+          const result = await bindToAccount(code)
+          sendJson(response, result.ok ? 200 : 400, result)
+        } catch (error) {
+          sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
         }
       },
     }),

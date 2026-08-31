@@ -125,7 +125,7 @@ describe('pollOnce', () => {
       '/api/bridge/report': () => new Response(JSON.stringify({ ok: true })),
     }, seen)
 
-    expect(await pollOnce(state('web'))).toBe('ok')
+    expect(await pollOnce(state('web'))).toBe('task')
 
     const report = seen.find((c) => c.path === '/api/bridge/report')
     expect(report?.body).toMatchObject({ sessionId: 's1', secret: 'sec1', taskId: 't1', status: 'done' })
@@ -160,7 +160,7 @@ describe('pollOnce', () => {
       '/api/bridge/report': () => new Response(JSON.stringify({ ok: true })),
     }, seen)
 
-    expect(await pollOnce(state('web'))).toBe('ok')
+    expect(await pollOnce(state('web'))).toBe('task')
     expect(mockedUpload).toHaveBeenCalledTimes(1)
     expect(mockedUpload.mock.calls[0]?.[0]).toEqual(payload)
     expect(mockedUpload.mock.calls[0]?.[1]).toBe('web')
@@ -179,7 +179,7 @@ describe('pollOnce', () => {
       '/api/bridge/report': () => new Response(JSON.stringify({ ok: true })),
     }, seen)
 
-    expect(await pollOnce(state('web'))).toBe('ok')
+    expect(await pollOnce(state('web'))).toBe('task')
     const report = seen.find((c) => c.path === '/api/bridge/report')
     expect(report?.body).toMatchObject({ taskId: 't3', status: 'failed', result: { error: 'boom' } })
   })
@@ -194,7 +194,7 @@ describe('pollOnce', () => {
       '/api/bridge/report': () => new Response(JSON.stringify({ ok: true })),
     }, seen)
 
-    expect(await pollOnce(state('web'))).toBe('ok')
+    expect(await pollOnce(state('web'))).toBe('task')
     const report = seen.find((c) => c.path === '/api/bridge/report')
     expect(report?.body).toMatchObject({ taskId: 't4', status: 'failed', result: { ok: false, error: '该版本已存在' } })
   })
@@ -208,7 +208,7 @@ describe('pollOnce', () => {
       '/api/bridge/report': () => new Response(JSON.stringify({ ok: true })),
     }, seen)
 
-    expect(await pollOnce(state('web'))).toBe('ok')
+    expect(await pollOnce(state('web'))).toBe('task')
     const report = seen.find((c) => c.path === '/api/bridge/report')
     expect(report?.body).toMatchObject({ taskId: 't5', status: 'failed', result: { error: expect.stringContaining('未知任务类型') } })
   })

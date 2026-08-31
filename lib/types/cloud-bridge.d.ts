@@ -22,12 +22,16 @@ interface BridgeState {
     secret: string;
     profile: string;
 }
+type PollOutcome = 'ok' | 'task' | 'rejected';
 export declare function register(profile: string, version: string): Promise<BridgeState>;
-/** 单轮轮询：取任务并执行。返回 'ok'（正常结束）或 'rejected'（凭据失效，需重注册）。 */
-export declare function pollOnce(state: BridgeState): Promise<'ok' | 'rejected'>;
+/** 单轮轮询：取任务并执行。返回 'task'（执行了任务）/ 'ok'（空轮询）/ 'rejected'（凭据失效）。 */
+export declare function pollOnce(state: BridgeState): Promise<PollOutcome>;
 /**
- * 启动云端发布通道：注册 + 无限轮询（随 DSH 进程生命周期运行）。
+ * 启动云端发布通道：注册 + 自适应退避轮询（随 DSH 进程生命周期运行）。
  * 所有失败（网络抖动 / 平台短时不可用）都静默等待下一轮，不抛错不退出。
+ *
+ * 退避逻辑：work（有任务/重新注册）→ 间隔复位到基础值；
+ * 空闲 → 间隔 ×2 递增，封顶 60s。既保住发布响应速度，又根除空闲轮询风暴。
  */
 export declare function startCloudBridge(profile: string): Promise<void>;
 export {};

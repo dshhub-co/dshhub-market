@@ -33,6 +33,7 @@ import {
   type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './Market.module.css'
+import type { MarketKey } from './locales'
 import { Diagnostics } from './Diagnostics.tsx'
 import { ReportDialog } from './ReportDialog.tsx'
 import { RatingDialog } from './RatingDialog.tsx'
@@ -156,13 +157,13 @@ function parseFaq(text: string): FaqEntry[] {
 interface ContactRow { label: string; value: string; kind: 'wechat' | 'link' | 'mail' | 'text' }
 
 /** 每行一条联系方式：微信 → 可复制；http 链接 → 跳转；邮箱 → mailto。 */
-function parseContacts(text: string): ContactRow[] {
+function parseContacts(text: string, t: (key: MarketKey, params?: Record<string, string | number>) => string): ContactRow[] {
   const rows: ContactRow[] = []
   for (const raw of (text ?? '').split('\n')) {
     const line = raw.trim()
     if (line === '') continue
     if (/^https?:\/\//.test(line)) {
-      rows.push({ label: '链接', value: line, kind: 'link' })
+      rows.push({ label: t('contactLink'), value: line, kind: 'link' })
       continue
     }
     const m = /^([^:：]{1,20})[:：]\s*(.+)$/.exec(line)
@@ -219,7 +220,7 @@ function PluginCreatorInfo({
   const steps = show.has('steps') ? (fields.gettingStarted ?? '').split('\n').map(s => s.trim()).filter(Boolean) : []
   const links = show.has('links') ? (fields.teachingLinks ?? '').split('\n').map(s => s.trim()).filter(Boolean) : []
   const faqs = show.has('faq') ? parseFaq(fields.faq ?? '') : []
-  const contacts = show.has('contact') ? parseContacts(fields.contact ?? '') : []
+  const contacts = show.has('contact') ? parseContacts(fields.contact ?? '', t) : []
   const changelog = show.has('changelog') ? (fields.changelog ?? '').trim() : ''
 
   if (demo === null && steps.length === 0 && links.length === 0 && faqs.length === 0
@@ -2657,7 +2658,7 @@ export function MarketSection(props: MarketSectionProps) {
                         })()}
 
                         {(() => {
-                          const contacts = parseContacts(bundle.contact ?? '')
+                          const contacts = parseContacts(bundle.contact ?? '', t)
                           if (contacts.length === 0 && (bundle.supportHours ?? '') === '') return null
                           return (
                             <div className={css.unlockedContact}>

@@ -140,6 +140,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			stepsLabel: "上手三步",
 			faqLabel: "常见问题",
 			contactLabel: "联系作者",
+			contactLink: "链接",
 			changelogLabel: "更新说明",
 			copyBtn: "复制",
 			copiedToast: "已复制",
@@ -535,6 +536,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			stepsLabel: "Getting started",
 			faqLabel: "FAQ",
 			contactLabel: "Contact the creator",
+			contactLink: "Link",
 			changelogLabel: "Changelog",
 			copyBtn: "Copy",
 			copiedToast: "Copied",
@@ -2928,14 +2930,14 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			return out.filter((f) => f.q !== "" || f.a !== "");
 		}
 		/** 每行一条联系方式：微信 → 可复制；http 链接 → 跳转；邮箱 → mailto。 */
-		function parseContacts(text) {
+		function parseContacts(text, t) {
 			const rows = [];
 			for (const raw of (text ?? "").split("\n")) {
 				const line = raw.trim();
 				if (line === "") continue;
 				if (/^https?:\/\//.test(line)) {
 					rows.push({
-						label: "链接",
+						label: t("contactLink"),
 						value: line,
 						kind: "link"
 					});
@@ -2993,7 +2995,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			const steps = show.has("steps") ? (fields.gettingStarted ?? "").split("\n").map((s) => s.trim()).filter(Boolean) : [];
 			const links = show.has("links") ? (fields.teachingLinks ?? "").split("\n").map((s) => s.trim()).filter(Boolean) : [];
 			const faqs = show.has("faq") ? parseFaq(fields.faq ?? "") : [];
-			const contacts = show.has("contact") ? parseContacts(fields.contact ?? "") : [];
+			const contacts = show.has("contact") ? parseContacts(fields.contact ?? "", t) : [];
 			const changelog = show.has("changelog") ? (fields.changelog ?? "").trim() : "";
 			if (demo === null && steps.length === 0 && links.length === 0 && faqs.length === 0 && contacts.length === 0 && changelog === "") return null;
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -5742,7 +5744,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 												});
 											})(),
 											(() => {
-												const contacts = parseContacts(bundle.contact ?? "");
+												const contacts = parseContacts(bundle.contact ?? "", t);
 												if (contacts.length === 0 && (bundle.supportHours ?? "") === "") return null;
 												return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 													className: Market_module_css_default.unlockedContact,

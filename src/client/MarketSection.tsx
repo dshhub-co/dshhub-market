@@ -45,7 +45,7 @@ import {
   formatCount, pageItems, pluginName, pluginScreenshots, readRegistryCache, readSession, themeSwatch, TIME_RANGE_DAYS, visiblePlugins, writeRegistryCache,
 } from './market-data.ts'
 import type {
-ActivationInfo, ActivationState, AppRunState, GistExportResult, InstalledMap, InstalledRepoHints, InstalledRepoIdentities, MarketStatus, Registry, RegistryPlugin,
+ActivationInfo, ActivationState, GistExportResult, InstalledMap, InstalledRepoHints, InstalledRepoIdentities, MarketStatus, Registry, RegistryPlugin,
   SharedHostPackageDependencyFinding, SortDir, SortField, ThemeSnapshot, TimeRange, Translate, UnlockedBundle, UnlockedBundleItem, UpdateStatus,
 } from './market-data.ts'
 
@@ -606,11 +606,6 @@ export function MarketSection(props: MarketSectionProps) {
   const [unlockInstallOk, setUnlockInstallOk] = useState<string | null>(null)
   const [unlocked, setUnlocked] = useState<UnlockedBundle[]>([])
   const [unlockBusyUrl, setUnlockBusyUrl] = useState<string | null>(null)
-  /** kind=app 运行态：name → 状态（/dsh-market/apps/status 轮询 + 部署/停止后刷新） */
-  const [appRuns, setAppRuns] = useState<Record<string, AppRunState>>({})
-  /** 部署/停止中的应用名（按钮转「部署中…/停止中…」防连点） */
-  const [appBusy, setAppBusy] = useState<string | null>(null)
-  const [appError, setAppError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
   /** 复制微信号等联系方式：一键复制 + 短暂反馈 */
@@ -1251,75 +1246,6 @@ export function MarketSection(props: MarketSectionProps) {
       .catch(error => setInstallError(String(error)))
       .finally(() => setUnlockBusyUrl(null))
   }, [refreshInstalled, blacklist])
-
-  // ---- kind=app 部署 / 停止 / 打开（零门槛：无弹窗无确认；审核在上架时已完成） ----
-
-  /** 拉取全部已安装应用的运行状态（部署/停止后 + 10s 轮询保活）。 */
-  const refreshAppRuns = useCallback(() => {
-    fetch('/dsh-market/apps/status', { cache: 'no-store' })
-      .then(res => res.json())
-      .then((body: { apps?: Record<string, AppRunState> }) => {
-        if (body.apps && typeof body.apps === 'object') setAppRuns(body.apps)
-      })
-      .catch(() => {})
-  }, [])
-
-  const deployAppItem = useCallback((item: UnlockedBundleItem) => {
-    const name = typeof item.name === 'string' ? item.name : ''
-    if (name === '') return
-    setAppError(null)
-    setAppBusy(name)
-    fetch('/dsh-market/apps/deploy', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    })
-      .then(res => res.json().then(body => ({ status: res.status, body })))
-      .then(({ status, body }) => {
-        if (status === 200 && body.ok) {
-          setAppRuns(prev => ({
-            ...prev,
-            [name]: { running: true, pid: body.pid, port: body.port, url: body.url, startedAt: body.startedAt },
-          }))
-          // 部署后浏览器新标签打开（用户手势内 window.open，不受弹窗拦截）
-          if (typeof body.url === 'string' && body.url !== '') window.open(body.url, '_blank', 'noopener')
-        } else {
-          setAppError(typeof body.error === 'string' ? body.error : `HTTP ${String(status)}`)
-        }
-      })
-      .catch(error => setAppError(String(error)))
-      .finally(() => setAppBusy(null))
-  }, [])
-
-  const stopAppItem = useCallback((item: UnlockedBundleItem) => {
-    const name = typeof item.name === 'string' ? item.name : ''
-    if (name === '') return
-    setAppError(null)
-    setAppBusy(name)
-    fetch('/dsh-market/apps/stop', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    })
-      .then(res => res.json().then(body => ({ status: res.status, body })))
-      .then(({ status, body }) => {
-        if (status === 200 && body.ok) {
-          setAppRuns(prev => ({ ...prev, [name]: { running: false } }))
-        } else {
-          setAppError(typeof body.error === 'string' ? body.error : `HTTP ${String(status)}`)
-        }
-      })
-      .catch(error => setAppError(String(error)))
-      .finally(() => setAppBusy(null))
-  }, [])
-
-  // kind=app 运行态保活：应用是独立本地进程，宿主重启/应用崩溃后本地状态会变，
-  // 10s 轮询把卡片上的「运行中·端口」与真实进程对齐（应用自己退出会自动清理）。
-  useEffect(() => {
-    refreshAppRuns()
-    const timer = setInterval(refreshAppRuns, 10_000)
-    return () => clearInterval(timer)
-  }, [refreshAppRuns])
 
   /** 删除一条口令解锁记录：只动 unlocked.json，已安装的插件不受影响。 */
   const doRemoveUnlock = useCallback(async () => {
@@ -2682,43 +2608,6 @@ export function MarketSection(props: MarketSectionProps) {
                               <div className={css.unlockedActions}>
                                 {removedNow ? (
                                   <span className={css.removedBadge}>{t('removedItemLabel')}</span>
-                                ) : installedMatch && item.kind === 'app' ? (
-                                  // kind=app：已安装 → 部署/停止/打开（应用是独立本地进程，
-                                  // 运行态由 apps/status 轮询驱动；部署成功后浏览器新标签打开）
-                                  appRuns[item.name ?? '']?.running === true ? (
-                                    <>
-                                      <span className={css.appRunning}>
-                                        <span className={css.appRunningDot} />
-                                        {t('appRunning').replace('{0}', String(appRuns[item.name ?? '']?.port ?? ''))}
-                                      </span>
-                                      <Button
-                                        variant="primary"
-                                        size="sm"
-                                        onClick={() => {
-                                          const url = appRuns[item.name ?? '']?.url
-                                          if (typeof url === 'string' && url !== '') window.open(url, '_blank', 'noopener')
-                                        }}
-                                      >{t('appOpen')}</Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={appBusy === item.name}
-                                        onClick={() => stopAppItem(item)}
-                                      >{appBusy === item.name ? t('appStopping') : t('appStop')}</Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={appBusy === item.name}
-                                        onClick={() => deployAppItem(item)}
-                                      >{appBusy === item.name ? t('appDeploying') : t('appDeploy')}</Button>
-                                      {appError !== null && (
-                                        <span className={css.appError}>{appError}</span>
-                                      )}
-                                    </>
-                                  )
                                 ) : installedMatch ? (
                                   <span className={css.unlockedInstalled}>{t('installedLabel')}</span>
                                 ) : (

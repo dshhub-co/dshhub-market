@@ -1,16 +1,14 @@
 /**
- * 左下角轻量入口（shell.overlay）：单行细胶囊 = 商城 + 快捷部署两个小图标，
- * 中间一条发丝分割线。替代原先「彩色购物车胶囊 + 火箭圆钮」两个独立浮层
+ * 左下角轻量入口（shell.overlay）：单行细胶囊 = 商城小图标。
+ * 替代原先「彩色购物车胶囊 + 火箭圆钮」两个独立浮层
  * —— 不占两行、不抢眼，静默贴在侧边栏设置钮上方。
  *
- * 点购物车 → 内嵌市场面板（复用设置页同一个 MarketSection）；
- * 点火箭 → DeployPanel（一键安装/部署/停止/打开 kind=app）。
+ * 点购物车 → 内嵌市场面板（复用设置页同一个 MarketSection）。
  * 弹层用 headless Modal：卡片内部全由自己排版。
  */
 import { useState, type ComponentProps } from 'react'
 import { Button, IconCloseOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './Market.module.css'
-import { DeployIcon, DeployPanel } from './DeployFab.tsx'
 import { MarketSection } from './MarketSection.tsx'
 import type { Translate } from './market-data.ts'
 
@@ -32,7 +30,7 @@ function CartIcon({ size = 17 }: { size?: number }) {
 }
 
 export function FabBar({ t, market }: FabBarDeps) {
-  const [panel, setPanel] = useState<'market' | 'deploy' | null>(null)
+  const [panel, setPanel] = useState<'market' | null>(null)
   return (
     <>
       <div className={css.fabBar}>
@@ -43,15 +41,6 @@ export function FabBar({ t, market }: FabBarDeps) {
           onClick={() => setPanel('market')}
         >
           <CartIcon />
-        </button>
-        <span className={css.fabBarDivider} />
-        <button
-          className={css.fabBarBtn}
-          title={t('deployFabTitle')}
-          aria-label={t('deployFabTitle')}
-          onClick={() => setPanel('deploy')}
-        >
-          <DeployIcon size={17} />
         </button>
       </div>
       {panel === 'market' && (
@@ -78,7 +67,6 @@ export function FabBar({ t, market }: FabBarDeps) {
           </div>
         </Modal>
       )}
-      {panel === 'deploy' && <DeployPanel t={t} onClose={() => setPanel(null)} />}
     </>
   )
 }

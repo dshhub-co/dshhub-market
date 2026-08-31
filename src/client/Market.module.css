@@ -389,10 +389,6 @@
 .auditBadgePass{color:#16a34a;background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.32)}
 .auditBadgeWarn{color:#d97706;background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.32)}
 /* ---- kind=app 运行态（部署/停止/打开 + 呼吸灯） ---- */
-.appRunning{font-size:12px;color:#16a34a;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.appRunningDot{width:7px;height:7px;border-radius:50%;background:#16a34a;display:inline-block;animation:appPulse 1.6s ease-in-out infinite}
-@keyframes appPulse{0%,100%{opacity:1}50%{opacity:.35}}
-.appError{font-size:12px;color:#ef4444;display:block;margin-top:4px;max-width:340px}
 
 /* ---- 解锁卡片 v2（买家体验：去商业味、有人味） ---- */
 .unlockedBy{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary,#6b7280)}

@@ -161,15 +161,6 @@ export interface MarketStatus {
 /** Post-install activation state (P0-2), per installed package. */
 export type ActivationState = 'live' | 'restart' | 'inert' | 'broken' | 'missing' | 'disabled'
 
-/** kind=app 本地进程运行态（/dsh-market/apps/status 与 deploy/stop 响应）。 */
-export interface AppRunState {
-  running: boolean
-  pid?: number
-  port?: number
-  url?: string
-  startedAt?: string
-}
-
 /** 口令解锁（买家侧）：dshhub.co 核销返回的商品条目与解锁记录。 */
 export interface UnlockedBundleItem {
   type: 'local' | 'github'

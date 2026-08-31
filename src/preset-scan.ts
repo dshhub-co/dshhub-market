@@ -41,9 +41,26 @@ const INSTALL_STATE_DIR = '.dshhub'
 /** Hidden state dirs that should never be scanned as publishable content. */
 const SKIP_DIRS = new Set(['.dshhub', '.git', 'node_modules', '__MACOSX'])
 
-/** 来源指纹：对应状态文件存在 = 市场安装过（无论之后是否改过内容，一律视为市场来源） */
-function installStateExists(stateDir: string, name: string): boolean {
-  return existsSync(join(stateDir, `${name}.json`))
+/**
+ * 来源指纹：解析状态目录下所有 .dshhub/*.json，收集「市场安装过的目录名」。
+ * 状态文件名是包名（如 dshhub-auto-cut.json），但里面 presets/skills 字段才是
+ * 实际安装的目录名（如 ["auto-cut"]）——按目录名查同名状态文件会失配（0.8.48 bug）。
+ */
+function marketInstalledDirs(stateDir: string, dirField: 'presets' | 'skills'): Set<string> {
+  const out = new Set<string>()
+  try {
+    for (const f of readdirSync(stateDir)) {
+      if (!f.endsWith('.json')) continue
+      const rec = JSON.parse(readFileSync(join(stateDir, f), 'utf8')) as Record<string, unknown>
+      const dirs = rec[dirField]
+      if (Array.isArray(dirs)) {
+        for (const d of dirs) if (typeof d === 'string' && d !== '') out.add(d)
+      }
+    }
+  } catch {
+    /* 无状态目录 = 没有市场安装过 */
+  }
+  return out
 }
 
 function isDir(path: string): boolean {
@@ -97,6 +114,7 @@ function presetRoots(profileDirectory: string): string[] {
 export function scanPresets(profileDirectory: string): ScannedItem[] {
   const out: ScannedItem[] = []
   const seen = new Set<string>()
+  const marketPresets = marketInstalledDirs(join(presetsRoot(profileDirectory), INSTALL_STATE_DIR), 'presets')
   for (const root of presetRoots(profileDirectory)) {
     for (const name of readdirSync(root)) {
       if (name.startsWith('.') || SKIP_DIRS.has(name)) continue
@@ -115,7 +133,7 @@ export function scanPresets(profileDirectory: string): ScannedItem[] {
         displayName: meta.name ?? name,
         description: meta.description ?? '',
         path: dir,
-        installSource: installStateExists(join(root, INSTALL_STATE_DIR), name) ? 'market' : 'user',
+        installSource: marketPresets.has(name) ? 'market' : 'user',
       })
     }
   }
@@ -145,6 +163,7 @@ function skillRoots(profileDirectory: string): string[] {
 export function scanSkills(profileDirectory: string): ScannedItem[] {
   const out: ScannedItem[] = []
   const seen = new Set<string>()
+  const marketSkills = marketInstalledDirs(join(dshHome(), 'skills', INSTALL_STATE_DIR), 'skills')
   for (const root of skillRoots(profileDirectory)) {
     for (const name of readdirSync(root)) {
       if (name.startsWith('.') || SKIP_DIRS.has(name)) continue
@@ -190,7 +209,7 @@ export function scanSkills(profileDirectory: string): ScannedItem[] {
         displayName,
         description,
         path: dir,
-        installSource: installStateExists(join(dshHome(), 'skills', INSTALL_STATE_DIR), name) ? 'market' : 'user',
+        installSource: marketSkills.has(name) ? 'market' : 'user',
       })
     }
   }

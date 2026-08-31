@@ -19,11 +19,30 @@
  */
 
 import { dirname, join } from 'node:path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, statSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { hostname as osHostname } from 'node:os'
 import { profileDir } from './profile.ts'
 import { readOwnVersion } from './self-update.ts'
 import { scanPresets, scanSkills } from './preset-scan.ts'
 import { publishUpload, type PublishUploadBody } from './bridge.ts'
+
+/** 在系统文件管理器中打开目录（「打开文件夹」任务；安全：只允许存在的目录，无提权） */
+function openInFileManager(dir: string): { ok: boolean; error?: string } {
+  try {
+    if (!dir || !existsSync(dir) || !statSync(dir).isDirectory()) {
+      return { ok: false, error: '目录不存在或不可访问' }
+    }
+    const [cmd, ...args] =
+      process.platform === 'darwin' ? ['open', dir]
+      : process.platform === 'win32' ? ['explorer', dir]
+      : ['xdg-open', dir]
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
 
 /** 口令插件市场 API 地址（本地调试可 DSHHUB_API_URL=http://localhost:3000） */
 const DSHHUB_API = process.env.DSHHUB_API_URL ?? 'https://www.dshhub.co'
@@ -73,7 +92,8 @@ export async function register(profile: string, version: string): Promise<Bridge
   const res = await fetch(`${DSHHUB_API}/api/bridge/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ profile, version }),
+    // 上报主机名：多台 DSH 在线时网页端可区分「这台是谁」
+    body: JSON.stringify({ profile, version, hostname: osHostname() }),
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`register HTTP ${res.status}`)
@@ -129,6 +149,12 @@ export async function pollOnce(state: BridgeState): Promise<PollOutcome> {
     } else if (type === 'upload') {
       const result = await publishUpload((task.payload ?? {}) as PublishUploadBody, state.profile)
       await report(state, taskId, result.ok ? 'done' : 'failed', result)
+    } else if (type === 'open') {
+      // 「打开文件夹」：在系统文件管理器中打开指定目录（来源=扫描结果，路径校验后执行）
+      const payload = (task.payload ?? {}) as { path?: unknown }
+      const dir = typeof payload.path === 'string' ? payload.path : ''
+      const opened = openInFileManager(dir)
+      await report(state, taskId, opened.ok ? 'done' : 'failed', opened)
     } else {
       await report(state, taskId, 'failed', { error: `未知任务类型：${type}` })
     }

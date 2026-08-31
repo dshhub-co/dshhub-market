@@ -418,33 +418,29 @@ function ScreenshotStrip({ plugin }: { plugin: RegistryPlugin }) {
 }
 
 /**
- * Official-style market glyph: the shared block-grid brand mark converted to
- * the official monochrome icon form (16×16, fill="currentColor") so it
- * follows the active theme. Mirrors the settings-nav glyph used for the
- * "market" section id.
+ * Unified dshhub brand glyph (monochrome, 16×16, fill="currentColor") so it
+ * follows the active theme: the six-digit passcode dot grid with the golden
+ * "plug" tile (tilted 9°, the awesome-dsh-plugin plug language) lighting up
+ * the top-right slot, over the ticket-tear base — identical to the dshhub.co
+ * web header mark and assets/logo.svg.
  */
 function MarketLogo({ size = 16, style, animated = false }: { size?: number; style?: CSSProperties; animated?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={style}>
       <g fill="currentColor">
-        <rect x="1.96" y="3.36" width="3.3" height="3.3" rx="0.53" />
-        <rect x="5.71" y="3.36" width="3.3" height="3.3" rx="0.53" />
-        <rect x="1.96" y="7.11" width="3.3" height="3.3" rx="0.53" />
-        <rect x="5.71" y="7.11" width="3.3" height="3.3" rx="0.53" />
-        <rect x="9.46" y="7.11" width="3.3" height="3.3" rx="0.53" />
-        <rect x="1.96" y="10.86" width="3.3" height="3.3" rx="0.53" />
-        <rect x="5.71" y="10.86" width="3.3" height="3.3" rx="0.53" />
-        <rect x="9.46" y="10.86" width="3.3" height="3.3" rx="0.53" />
+        <circle cx="5" cy="4.75" r="1" />
+        <circle cx="8" cy="4.75" r="1" />
+        <circle cx="5" cy="7.75" r="1" />
+        <circle cx="8" cy="7.75" r="1" />
+        <circle cx="11" cy="7.75" r="1" />
+        {/* 底部撕票口：口令 = 一张票 */}
+        <rect x="4.5" y="11.5" width="7" height="1" rx="0.5" opacity=".55" />
       </g>
-      {/* The block being plugged in: OUTSIDE the grid's empty corner, offset
-          (+1.28, -1.27) and tilted 9deg, exactly as in assets/logo.svg. The
-          earlier icon sat it neatly in the empty slot, which reads as one
-          crooked tile rather than a block arriving — the whole idea of the
-          mark, and the reason it no longer matched the GitHub logo. */}
+      {/* 被点亮的「插件插头」：右上角金色位，微倾 9°（同 assets/logo.svg） */}
       <rect
         className={animated ? css.logoPlug : undefined}
-        x="10.74" y="2.09" width="3.3" height="3.3" rx="0.53" fill="currentColor"
-        transform={animated ? undefined : 'rotate(9 12.39 3.74)'}
+        x="10" y="3.75" width="2" height="2" rx="0.5" fill="currentColor"
+        transform={animated ? undefined : 'rotate(9 11 4.75)'}
       />
     </svg>
   )

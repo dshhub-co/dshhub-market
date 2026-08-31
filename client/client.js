@@ -3231,10 +3231,11 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			});
 		}
 		/**
-		* Official-style market glyph: the shared block-grid brand mark converted to
-		* the official monochrome icon form (16×16, fill="currentColor") so it
-		* follows the active theme. Mirrors the settings-nav glyph used for the
-		* "market" section id.
+		* Unified dshhub brand glyph (monochrome, 16×16, fill="currentColor") so it
+		* follows the active theme: the six-digit passcode dot grid with the golden
+		* "plug" tile (tilted 9°, the awesome-dsh-plugin plug language) lighting up
+		* the top-right slot, over the ticket-tear base — identical to the dshhub.co
+		* web header mark and assets/logo.svg.
 		*/
 		function MarketLogo({ size = 16, style, animated = false }) {
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
@@ -3248,72 +3249,49 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
 					fill: "currentColor",
 					children: [
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "1.96",
-							y: "3.36",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+							cx: "5",
+							cy: "4.75",
+							r: "1"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+							cx: "8",
+							cy: "4.75",
+							r: "1"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+							cx: "5",
+							cy: "7.75",
+							r: "1"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+							cx: "8",
+							cy: "7.75",
+							r: "1"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+							cx: "11",
+							cy: "7.75",
+							r: "1"
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "5.71",
-							y: "3.36",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "1.96",
-							y: "7.11",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "5.71",
-							y: "7.11",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "9.46",
-							y: "7.11",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "1.96",
-							y: "10.86",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "5.71",
-							y: "10.86",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
-							x: "9.46",
-							y: "10.86",
-							width: "3.3",
-							height: "3.3",
-							rx: "0.53"
+							x: "4.5",
+							y: "11.5",
+							width: "7",
+							height: "1",
+							rx: "0.5",
+							opacity: ".55"
 						})
 					]
 				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
 					className: animated ? Market_module_css_default.logoPlug : void 0,
-					x: "10.74",
-					y: "2.09",
-					width: "3.3",
-					height: "3.3",
-					rx: "0.53",
+					x: "10",
+					y: "3.75",
+					width: "2",
+					height: "2",
+					rx: "0.5",
 					fill: "currentColor",
-					transform: animated ? void 0 : "rotate(9 12.39 3.74)"
+					transform: animated ? void 0 : "rotate(9 11 4.75)"
 				})]
 			});
 		}

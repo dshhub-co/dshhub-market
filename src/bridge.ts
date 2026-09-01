@@ -26,6 +26,7 @@ import { installPreset } from './preset-install.ts'
 import { scanPresets, scanSkills, type ScannedItem } from './preset-scan.ts'
 import { buildPublishInfo, publishItems, type PublishItemInfo, type PublishResult } from './publish.ts'
 import { profileDir } from './profile.ts'
+import { openStandardDir } from './cloud-bridge.ts'
 
 export const PORTS = [3750, 3751, 3752, 3753, 3754]
 const MAX_BODY = 64 * 1024
@@ -207,6 +208,23 @@ export function createBridgeServer(opts: { profile: string }): ReturnType<typeof
       return
     }
 
+    if (req.method === 'POST' && url === '/dsh-market/open-dir') {
+      // 发布页「一键打开标准目录」（presets/skills）——本地直连，不依赖云端轮询
+      readBody(req)
+        .then((buf) => {
+          let which: 'presets' | 'skills' | null = null
+          try {
+            const parsed = JSON.parse(buf.toString('utf8') || '{}') as { which?: unknown }
+            const w = parsed.which
+            which = (w === 'presets' || w === 'skills') ? w : null
+          } catch { /* empty body */ }
+          if (which === null) return { ok: false, error: 'invalid which' }
+          return openStandardDir(which)
+        })
+        .then((r) => send(res, r.ok ? 200 : 400, r))
+        .catch(() => send(res, 400, { ok: false, error: '请求无效' }))
+      return
+    }
     if (req.method === 'POST' && url === '/install') {
       readBody(req)
         .then((buf) => {

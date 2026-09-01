@@ -27,6 +27,21 @@ export declare function bindToAccount(code: string): Promise<{
     ok: boolean;
     error?: string;
 }>;
+/** 在系统文件管理器中打开目录（「打开文件夹」任务；安全：只允许存在的目录，无提权） */
+export declare function openInFileManager(dir: string): {
+    ok: boolean;
+    error?: string;
+};
+/**
+ * 打开 DSH 标准目录（发布页「一键打开」按钮用，2026-09-02）：
+ *   'presets' → ~/.dsh/.agent-presets；'skills' → ~/.dsh/skills。
+ * 目录不存在时返回提示（不报错）。
+ */
+export declare function openStandardDir(which: 'presets' | 'skills'): {
+    ok: boolean;
+    dir?: string;
+    error?: string;
+};
 interface BridgeState {
     sessionId: string;
     secret: string;

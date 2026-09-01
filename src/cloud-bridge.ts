@@ -76,7 +76,7 @@ export async function bindToAccount(code: string): Promise<{ ok: boolean; error?
 }
 
 /** 在系统文件管理器中打开目录（「打开文件夹」任务；安全：只允许存在的目录，无提权） */
-function openInFileManager(dir: string): { ok: boolean; error?: string } {
+export function openInFileManager(dir: string): { ok: boolean; error?: string } {
   try {
     if (!dir || !existsSync(dir) || !statSync(dir).isDirectory()) {
       return { ok: false, error: '目录不存在或不可访问' }
@@ -90,6 +90,21 @@ function openInFileManager(dir: string): { ok: boolean; error?: string } {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+/**
+ * 打开 DSH 标准目录（发布页「一键打开」按钮用，2026-09-02）：
+ *   'presets' → ~/.dsh/.agent-presets；'skills' → ~/.dsh/skills。
+ * 目录不存在时返回提示（不报错）。
+ */
+export function openStandardDir(which: 'presets' | 'skills'): { ok: boolean; dir?: string; error?: string } {
+  const base = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+  const dir = which === 'presets' ? join(base, '.agent-presets') : join(base, 'skills')
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    return { ok: false, dir, error: '目录不存在（可能还没装过 Agent 模式/技能）' }
+  }
+  const r = openInFileManager(dir)
+  return { ok: r.ok, dir, error: r.error }
 }
 
 /** 口令插件市场 API 地址（本地调试可 DSHHUB_API_URL=http://localhost:3000） */

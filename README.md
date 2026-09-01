@@ -45,9 +45,99 @@ The platform shows you redemption stats and per-batch breakdowns, so you always 
 
 Generating a passcode costs a small number of points — top up whenever you need more.
 
-## Install
+## Quick start: 4 steps, try a passcode
+
+**Step 1 — Install DeepSeek Harness (if you haven't)**
+
+Paste this into your terminal. The wizard checks Node.js, pnpm and DSH on your machine and walks you through anything that's missing:
+
+```sh
+curl -fsSL https://www.dshhub.co/install.sh -o dshhub-install.sh && bash dshhub-install.sh
+```
+
+**Step 2 — Install the passcode marketplace**
+
+```sh
+dsh plugin --profile web add dshhub-market
+```
+
+**Step 3 — Restart DSH and open the market**
+
+Restart `dsh web`, then open **Settings → Plugin Market**.
+
+**Step 4 — Try a passcode**
+
+Enter the demo code **080808** — a skin plugin unlocks and installs itself on the spot.
+
+When a buyer gets a passcode from you, they do the same final step: open the market, enter the code, and the plugin installs. No account, no sign-up.
+
+## Install options (advanced)
+
+Requires dsh web 0.1.0-rc.6 or newer. Besides the official wizard above, you can also install with any of these:
 
 Requires dsh web 0.1.0-rc.6 or newer.
 
 From npm (recommended — smoothest upgrades):
 
+```sh
+dsh plugin --profile web add dshhub-market
+```
+
+Or a pinned version from DSHHub.co (versioned links never change, so lockfile checksums stay stable):
+
+```sh
+dsh plugin --profile web add https://www.dshhub.co/dshhub-market-0.8.51.tgz
+```
+
+Or from GitHub:
+
+```sh
+dsh plugin --profile web add github:dshhub-co/dshhub-market
+```
+
+Restart `dsh web`, then open **Settings → Plugin Market**.
+
+> Note: if you install from the website versioned link, run `pnpm install --update-checksums` in the profile directory after each release (the link points at the latest tarball, so the lockfile checksum needs a refresh). GitHub installs work out of the box, with no build scripts to allow.
+>
+> On an older host the market disables itself and says so in the browser console — if the Plugin Market entry never appears, that's usually why.
+
+## Under the hood
+
+As a market app it also carries these real capabilities:
+
+- **Passcode unlock & install** — enter a code, it installs; sources are validated against the DSHHub.co registry allowlist
+- **Theme skins** — apply instantly, no restart
+- **Update / uninstall** — two-step confirm against accidents
+- **Hot disable / enable** — takes effect in about a second, survives reboots
+- **Backup & restore** — daily auto-backup to WebDAV, or sync across machines via a private Gist
+- **Diagnostics** — load order and conflicts on one page
+- **Load order management** — drag to reorder, validated before anything is written
+- **AI fix hints** — one click copies a diagnostics-driven repair prompt
+- **Sanitized log export** — bug reports carry the version, private details masked
+
+## Security
+
+- Installs are restricted to sources in the DSHHub.co registry — anything else is rejected
+- Code from private repositories never enters the public catalog — it passes through the platform only when a buyer redeems a code
+- Build scripts stay blocked by default; allowing one is your explicit choice
+- The install endpoint accepts same-origin requests only
+- The local bridge for dshhub.co accepts loopback and dshhub.co origins only
+- Clear warnings before backup export; logs are sanitized throughout
+
+## Fork
+
+This is a fork of [dsh-market/dsh-market](https://github.com/dsh-market/dsh-market) (MIT license, copyright retained) with the same market engine. Differences: rebranded as `dshhub-market`, with the registry and self-update channel pointing at [DSHHub.co](https://www.dshhub.co). The full change list and resync procedure live in [UPSTREAM.md](UPSTREAM.md).
+
+## Feedback
+
+Bugs go in [issues](https://github.com/dshhub-co/dshhub-market/issues) — attaching the market's exported log makes diagnosis about ten times faster. Feature ideas are welcome too; say what you're planning before a big PR, so two people don't build the same thing twice.
+
+Note: this repository is the market app itself, not the catalog. The plugin list is served by dshhub.co — list your work there, and please don't open PRs for plugin entries here.
+
+## Data source
+
+Live from [www.dshhub.co/api/registry/plugins.json](https://www.dshhub.co/api/registry/plugins.json), with a bundled snapshot as offline fallback.
+
+## License
+
+MIT · fork of [dsh-market](https://github.com/dsh-market/dsh-market) · [dshhub.co](https://www.dshhub.co)

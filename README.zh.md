@@ -55,9 +55,110 @@ DSH 了：重装、更新都不再扣码。
 
 生成口令消耗少量积分，积分可随时充值。
 
-## 安装
+## 快速开始：4 步装好，试一个口令
+
+**第 1 步：装好 DeepSeek Harness（还没有的话）**
+
+把下面这条命令复制到终端回车，向导会自动体检你电脑上的 Node.js、pnpm 和 DSH——
+缺什么会提醒你，并一步步帮你装好：
+
+```sh
+curl -fsSL https://www.dshhub.co/install.sh -o dshhub-install.sh && bash dshhub-install.sh
+```
+
+**第 2 步：安装口令插件市场**
+
+```sh
+dsh plugin --profile web add dshhub-market
+```
+
+**第 3 步：重启 DSH，打开市场**
+
+重启 `dsh web`，进入 **设置 → 插件市场**。
+
+**第 4 步：输一个口令试试**
+
+输入演示口令 **080808**——一个皮肤插件当场解锁装好，立刻看到效果。
+
+以后买家拿到你发的口令，走的也是这最后一步：打开市场 → 输码 → 插件装好，
+不用注册、不用登录。
+
+## 安装方式（进阶）
+
+需要 dsh web 0.1.0-rc.6 或更新版本。除了上面的官方向导，也可以任选一种方式安装：
 
 需要 dsh web 0.1.0-rc.6 或更新版本。
 
 从 npm（推荐，升级最省心）：
 
+```sh
+dsh plugin --profile web add dshhub-market
+```
+
+或从 DSHHub.co 指定版本（版本化链接内容永不改变，锁文件指纹稳定）：
+
+```sh
+dsh plugin --profile web add https://www.dshhub.co/dshhub-market-0.8.51.tgz
+```
+
+或从 GitHub：
+
+```sh
+dsh plugin --profile web add github:dshhub-co/dshhub-market
+```
+
+重启 `dsh web`，打开 **设置 → 插件市场**。
+
+> 提示：若用网站版本化链接安装，每次新版本发布后需在 profile 目录跑一次
+> `pnpm install --update-checksums`（链接指向最新包，锁文件指纹需刷新）；
+> GitHub 直装开箱即用，无需放行构建脚本。
+>
+> 宿主太旧时市场会自我禁用并在浏览器控制台说明原因——如果设置里始终没有
+> 「插件市场」这一项，通常就是这个原因。
+
+## 底层能力
+
+作为市场应用，它还自带这些实在的能力：
+
+- **口令解锁安装**——输码即装，来源经 DSHHub.co registry 白名单校验
+- **主题皮肤**——即装即换，无需重启
+- **更新 / 卸载**——两步确认防误触
+- **热禁用 / 启用**——约 1 秒生效，重启不丢
+- **备份与恢复**——WebDAV 每日自动备份，或私有 Gist 跨机器同步
+- **诊断**——加载顺序与冲突一页看全
+- **加载顺序管理**——拖拽调整，写入前先校验
+- **AI 修复提示**——一键复制诊断驱动的修复建议
+- **脱敏日志导出**——反馈 bug 自带版本信息，隐私打码
+
+## 安全
+
+- 只允许安装 DSHHub.co registry 内的来源，其它一律拒绝
+- 私有仓库的代码不会进入公开目录——只在买家输码安装时经平台中转
+- 构建脚本默认禁止执行，放行与否由你决定
+- 安装接口只接受同源请求
+- 网站端本地桥接只接受环回地址与 dshhub.co 来源
+- 备份导出前明确警告；日志全程脱敏
+
+## Fork 说明
+
+本项目 fork 自 [dsh-market/dsh-market](https://github.com/dsh-market/dsh-market)
+（MIT 许可，版权保留），市场引擎相同。差异：品牌改为 `dshhub-market`，
+目录与自更新通道指向 [DSHHub.co](https://www.dshhub.co)。
+完整改动清单与重同步流程见 [UPSTREAM.md](UPSTREAM.md)。
+
+## 反馈
+
+Bug 提 [issue](https://github.com/dshhub-co/dshhub-market/issues)，附上「导出日志」
+能让排查快十倍。功能建议也欢迎，动手做大 PR 前先说一声，免得两个人重复造。
+
+注意：这个仓库是市场应用本身，不是插件目录——插件列表由 dshhub.co 提供，
+请在那里上架，不要往本仓库提插件条目。
+
+## 数据源
+
+实时来自 [www.dshhub.co/api/registry/plugins.json](https://www.dshhub.co/api/registry/plugins.json)，
+内置快照做离线兜底。
+
+## 许可
+
+MIT · fork of [dsh-market](https://github.com/dsh-market/dsh-market) · [dshhub.co](https://www.dshhub.co)

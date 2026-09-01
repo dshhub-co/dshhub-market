@@ -874,15 +874,28 @@ export function MarketSection(props: MarketSectionProps) {
     return () => clearInterval(timer)
   }, [])
 
-  // 公开市场开关（2026-09-02）：管理端可随时开/关；关闭时不显示公开市场 Tab
+  // 公开市场开关（2026-09-02）：管理端可随时开/关；关闭时不显示公开市场 Tab。
+  // 周期刷新（60s）：开关变化后 ~1 分钟内自动生效，不用重启 DSH。
   useEffect(() => {
-    fetch('/dsh-market/public-status', { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((body: { publicEnabled?: unknown }) => {
-        setPublicEnabled(body.publicEnabled !== false)
-      })
-      .catch(() => setPublicEnabled(true)) // 平台不可达：默认放开，不锁死功能
-  }, [])
+    const load = () => {
+      fetch('/dsh-market/public-status', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((body: { publicEnabled?: unknown }) => {
+          const enabled = body.publicEnabled !== false
+          setPublicEnabled((prev) => {
+            if (prev !== enabled && !enabled && tab === 'discover') {
+              // 公开市场被关闭且用户正在公开市场 Tab：自动切回口令解锁
+              setTab('redeem')
+            }
+            return enabled
+          })
+        })
+        .catch(() => setPublicEnabled(true)) // 平台不可达：默认放开，不锁死功能
+    }
+    load()
+    const timer = setInterval(load, 60_000)
+    return () => clearInterval(timer)
+  }, [tab])
 
   useEffect(() => {
     const timer = setInterval(() => {

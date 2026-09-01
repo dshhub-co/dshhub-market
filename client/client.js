@@ -3701,10 +3701,19 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				return () => clearInterval(timer);
 			}, []);
 			(0, react.useEffect)(() => {
-				fetch("/dsh-market/public-status", { cache: "no-store" }).then((res) => res.json()).then((body) => {
-					setPublicEnabled(body.publicEnabled !== false);
-				}).catch(() => setPublicEnabled(true));
-			}, []);
+				const load = () => {
+					fetch("/dsh-market/public-status", { cache: "no-store" }).then((res) => res.json()).then((body) => {
+						const enabled = body.publicEnabled !== false;
+						setPublicEnabled((prev) => {
+							if (prev !== enabled && !enabled && tab === "discover") setTab("redeem");
+							return enabled;
+						});
+					}).catch(() => setPublicEnabled(true));
+				};
+				load();
+				const timer = setInterval(load, 6e4);
+				return () => clearInterval(timer);
+			}, [tab]);
 			(0, react.useEffect)(() => {
 				const timer = setInterval(() => {
 					fetch("/dsh-market/status", { cache: "no-store" }).then((res) => res.json()).then((status) => {

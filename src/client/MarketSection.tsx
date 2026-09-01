@@ -590,11 +590,13 @@ export function MarketSection(props: MarketSectionProps) {
   const [tab, setTab] = useState(() => {
     const saved = sessionStorage.getItem('dshm-tab')
     if (saved !== null) sessionStorage.removeItem('dshm-tab')
-    // 旧版目录标签（discover / 三档分类）已由「口令解锁」取代
-    const legacy = new Set(['discover', 'appearance', 'utility', 'agentic', 'themes'])
+    // 旧版三档分类标签已由「口令解锁」取代；discover（公开市场）作为独立 Tab 保留
+    const legacy = new Set(['appearance', 'utility', 'agentic', 'themes'])
     const value = saved ?? 'redeem'
     return legacy.has(value) ? 'redeem' : value
   })
+  // 公开市场开关（管理端可关）：null=加载中（先不显示入口避免闪烁）
+  const [publicEnabled, setPublicEnabled] = useState<boolean | null>(null)
   const [redeemCode, setRedeemCode] = useState('')
   const [redeeming, setRedeeming] = useState(false)
   const [redeemError, setRedeemError] = useState<string | null>(null)
@@ -870,6 +872,16 @@ export function MarketSection(props: MarketSectionProps) {
     load()
     const timer = setInterval(load, 60_000)
     return () => clearInterval(timer)
+  }, [])
+
+  // 公开市场开关（2026-09-02）：管理端可随时开/关；关闭时不显示公开市场 Tab
+  useEffect(() => {
+    fetch('/dsh-market/public-status', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((body: { publicEnabled?: unknown }) => {
+        setPublicEnabled(body.publicEnabled !== false)
+      })
+      .catch(() => setPublicEnabled(true)) // 平台不可达：默认放开，不锁死功能
   }, [])
 
   useEffect(() => {
@@ -2229,6 +2241,9 @@ export function MarketSection(props: MarketSectionProps) {
         </div>
         <div className={css.tabs}>
           <button className={tab === 'redeem' ? `${css.tab} ${css.on}` : css.tab} onClick={() => setTab('redeem')}>{t('tabRedeem')}</button>
+          {publicEnabled !== false && (
+            <button className={tab === 'discover' ? `${css.tab} ${css.on}` : css.tab} onClick={() => setTab('discover')}>{t('tabPublic')}</button>
+          )}
           <button className={tab === 'installed' ? `${css.tab} ${css.on}` : css.tab} onClick={() => { setTab('installed'); refreshInstalled(true) }}>
             {t('tabInstalled') + (Object.keys(installed).length > 0 ? ' (' + Object.keys(installed).length + ')' : '')}
             {hasUpdates && <StateDot state="error" size={7} className={css.dot} />}

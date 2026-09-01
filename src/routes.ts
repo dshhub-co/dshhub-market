@@ -826,6 +826,29 @@ export function mountMarketRoutes(
 
     host.webServer.register({
       kind: 'exact',
+      path: '/dsh-market/public-status',
+      handler: async (request, response) => {
+        if (request.method !== 'GET') {
+          response.writeHead(405, { allow: 'GET' })
+          response.end()
+          return
+        }
+        try {
+          // 服务端转发平台开关接口（客户端浏览器不直连平台，走宿主路由）
+          const upstream = await fetch(`${DSHHUB_API}/api/market/public-status`, {
+            signal: AbortSignal.timeout(8_000),
+          })
+          const body = (await upstream.json().catch(() => ({}))) as { publicEnabled?: unknown }
+          sendJson(response, 200, { publicEnabled: body.publicEnabled !== false })
+        } catch (error) {
+          // 平台不可达：默认放开公开市场（宁可见目录，不因开关接口故障锁死功能）
+          sendJson(response, 200, { publicEnabled: true })
+        }
+      },
+    }),
+
+    host.webServer.register({
+      kind: 'exact',
       path: '/dsh-market/registry',
       handler: async (request, response) => {
         if (request.method !== 'GET') {

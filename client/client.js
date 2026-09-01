@@ -69,6 +69,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			searchPh: "搜索插件，比如：通知、终端、记忆…",
 			tabDiscover: "发现",
 			tabRedeem: "口令解锁",
+			tabPublic: "公开市场",
 			tabInstalled: "已安装",
 			all: "全部",
 			install: "安装",
@@ -465,6 +466,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 			searchPh: "Search plugins: notify, terminal, memory…",
 			tabDiscover: "Discover",
 			tabRedeem: "Passcode",
+			tabPublic: "Public market",
 			tabInstalled: "Installed",
 			all: "All",
 			install: "Install",
@@ -3443,7 +3445,6 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				const saved = sessionStorage.getItem("dshm-tab");
 				if (saved !== null) sessionStorage.removeItem("dshm-tab");
 				const legacy = /* @__PURE__ */ new Set([
-					"discover",
 					"appearance",
 					"utility",
 					"agentic",
@@ -3452,6 +3453,7 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				const value = saved ?? "redeem";
 				return legacy.has(value) ? "redeem" : value;
 			});
+			const [publicEnabled, setPublicEnabled] = (0, react.useState)(null);
 			const [redeemCode, setRedeemCode] = (0, react.useState)("");
 			const [redeeming, setRedeeming] = (0, react.useState)(false);
 			const [redeemError, setRedeemError] = (0, react.useState)(null);
@@ -3697,6 +3699,11 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 				load();
 				const timer = setInterval(load, 6e4);
 				return () => clearInterval(timer);
+			}, []);
+			(0, react.useEffect)(() => {
+				fetch("/dsh-market/public-status", { cache: "no-store" }).then((res) => res.json()).then((body) => {
+					setPublicEnabled(body.publicEnabled !== false);
+				}).catch(() => setPublicEnabled(true));
 			}, []);
 			(0, react.useEffect)(() => {
 				const timer = setInterval(() => {
@@ -5166,6 +5173,11 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 										className: tab === "redeem" ? `${Market_module_css_default.tab} ${Market_module_css_default.on}` : Market_module_css_default.tab,
 										onClick: () => setTab("redeem"),
 										children: t("tabRedeem")
+									}),
+									publicEnabled !== false && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										className: tab === "discover" ? `${Market_module_css_default.tab} ${Market_module_css_default.on}` : Market_module_css_default.tab,
+										onClick: () => setTab("discover"),
+										children: t("tabPublic")
 									}),
 									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 										className: tab === "installed" ? `${Market_module_css_default.tab} ${Market_module_css_default.on}` : Market_module_css_default.tab,

@@ -24,6 +24,16 @@ import { spawn } from 'node:child_process'
 import { hostname as osHostname, homedir } from 'node:os'
 import { profileDir } from './profile.ts'
 import { readOwnVersion } from './self-update.ts'
+
+/** 简单语义化版本比较：'a.b.c' < 'x.y.z' 返回 true（用于升级门禁判断）。 */
+function isOlderVersion(v: string, min: string): boolean {
+  const a = v.split('.').map((n) => parseInt(n, 10) || 0)
+  const b = min.split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+  }
+  return false
+}
 import { scanPresets, scanSkills } from './preset-scan.ts'
 import { publishUpload, type PublishUploadBody } from './bridge.ts'
 
@@ -104,7 +114,7 @@ interface BridgeState {
   profile: string
 }
 
-type PollOutcome = 'ok' | 'task' | 'rejected'
+type PollOutcome = 'ok' | 'task' | 'rejected' | 'upgrade-required'
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
@@ -163,7 +173,11 @@ export async function pollOnce(state: BridgeState): Promise<PollOutcome> {
   const res = await fetch(`${DSHHUB_API}/api/bridge/poll`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId: state.sessionId, secret: state.secret }),
+    body: JSON.stringify({
+      sessionId: state.sessionId,
+      secret: state.secret,
+      clientVersion: readOwnVersion(), // 上报版本，服务端据此做强制升级门禁
+    }),
     signal: AbortSignal.timeout(10_000),
   })
   if (res.status === 403) return 'rejected'
@@ -171,8 +185,20 @@ export async function pollOnce(state: BridgeState): Promise<PollOutcome> {
   const d = (await res.json()) as {
     task?: { taskId?: unknown; type?: unknown; payload?: Record<string, unknown> } | null
     error?: unknown
+    minVersion?: unknown
   }
   if (d.error) return 'rejected'
+
+  // 强制升级门禁（2026-09-01）：服务端声明最低版本，低于即停止轮询并触发升级
+  const min = typeof d.minVersion === 'string' ? d.minVersion : ''
+  if (min !== '' && isOlderVersion(readOwnVersion(), min)) {
+    console.warn(
+      `[dshhub-market] 本插件 v${readOwnVersion()} 低于要求的最低版本 v${min}，` +
+      `已停止轮询以保护平台资源，请升级到最新版（dsh plugin --profile ${state.profile} update dshhub-market）。`,
+    )
+    return 'upgrade-required'
+  }
+
   const task = d.task
   if (task === null || task === undefined) return 'ok'
   const taskId = String(task.taskId ?? '')
@@ -230,7 +256,10 @@ export async function startCloudBridge(profile: string): Promise<void> {
         worked = true
       } else {
         const outcome = await pollOnce(state)
-        if (outcome === 'rejected') {
+        if (outcome === 'upgrade-required') {
+          // 版本过旧被平台拒绝：停止轮询（不再消耗平台资源），等待用户升级
+          return
+        } else if (outcome === 'rejected') {
           // 凭据被平台废弃（如会话被清理）——重新注册
           state = await register(profile, readOwnVersion())
           worked = true

@@ -32,7 +32,7 @@ interface BridgeState {
     secret: string;
     profile: string;
 }
-type PollOutcome = 'ok' | 'task' | 'rejected';
+type PollOutcome = 'ok' | 'task' | 'rejected' | 'upgrade-required';
 export declare function register(profile: string, version: string): Promise<BridgeState>;
 /** 单轮轮询：取任务并执行。返回 'task'（执行了任务）/ 'ok'（空轮询）/ 'rejected'（凭据失效）。 */
 export declare function pollOnce(state: BridgeState): Promise<PollOutcome>;

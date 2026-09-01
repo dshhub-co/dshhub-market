@@ -12,38 +12,44 @@ English | [中文](README.zh.md)
 
 > The good stuff has a code. Enter it, get it.
 
-dshhub-market is the unlock-with-a-code plugin market inside DSH (DeepSeek Harness). Buyers enter a code and the plugin installs itself; creators hand out codes in their own channels and get their best work into the right hands; free plugins find their people too. Run by [DSHHub.co](https://www.dshhub.co).
+dshhub-market is the **unlock-with-a-passcode plugin market** inside DSH (DeepSeek Harness): buyers enter a 6-character passcode and the plugin installs itself on the spot; creators list their plugins as passcode products and sell them in their own private channels, collecting payment **however they like** — the platform only generates and verifies passcodes, and never touches your pricing or payments. Run by [DSHHub.co](https://www.dshhub.co).
 
-## What you see
+## For buyers: one passcode box
 
-Picture it: you open the plugin market inside DSH, and the homepage holds exactly one thing — a small box for a six-digit code.
+Open the plugin market inside DSH and the home screen holds exactly one thing — a small box for a six-character code.
 
-No catalog. No recommendations. No sign-up. As a buyer you never log in anywhere; the only door is the code itself, something like 3K7M9P.
+No catalog, no sign-up, no ads. As a buyer you never log in anywhere; the only door is the code itself, something like `3K7M9P`. Where does the code come from? From the creator: a video, a livestream, an article, or a community.
 
-Try the demo code **080808**: a skin plugin unlocks and installs itself on the spot, and you see the effect immediately. Consider it a handshake.
+Try the demo code **080808**: a skin plugin unlocks and installs itself on the spot and you see the effect immediately. Press Enter and everything just happens — the plugin, or a whole pack, unlocks, installs and is ready to use. Updates are free from then on. It feels like typing a verification code, because it's built to.
 
-Press Enter and everything just happens: the plugin — or a whole pack of them — unlocks, installs, and is ready to use. Updates are free from then on. It feels like typing a verification code, because it's built to. Unlocking only installs — no payment is involved.
+Entering a code only unlocks and installs: you got the code from the creator, and the platform is not involved in any payment.
 
-Once unlocked, each card talks about two things only: who made it, and what it's for. Who's behind it, a note from them, what it does, an install button, a short guide, how to reach the author — everything orbits a person and their work. No ads, no noise.
+Once unlocked, each card talks about two things only: **who made it** and **what it's for** — the author, a note from them, what it does, a short guide, and how to reach them. No ads, no noise.
 
 Everything you've unlocked sits in "My unlocked plugins," ready to install, switch, or remove any time. Unlocked plugins remember your DSH: reinstall and update without burning the code again.
 
-## What you get as a creator
+## For creators: turn your plugin into private-channel income
 
 Creators work from [dshhub.co](https://www.dshhub.co), signed in with their GitHub account. Two ways to stock your shelf:
 
 - Pick a plugin from the official curated catalog
-- Import your own GitHub repository — public or private
+- Import your own GitHub repository (public or private), or scan the presets & skills tuned in your local DSH
 
-Then generate a code and hand it out anywhere your people are: a video, a livestream, an article. Anyone who enters it gets the plugin installed on the spot. The platform shows you redemption stats and per-batch breakdowns, so you always know which code reached how many people. A code dies at redemption; until then it can be passed along — perfect for your distribution partners.
+Then **generate passcodes** and distribute them in your private channels:
 
-What you're really offering isn't source code — it's teaching, answering questions, being there for people. The plugins are free; what the code pays for is the person behind them. The platform takes zero cut for now, and any future pricing will be announced well ahead of time.
+1. Collect payment your way — WeChat, Alipay, Stripe, PayPal, cash, whatever you like;
+2. Send the passcode to the paying buyer;
+3. The buyer enters the code in DSH and the plugin unlocks and installs on the spot.
+
+The platform shows you redemption stats and per-batch breakdowns, so you always know which code reached how many people. Passcodes come in two flavors: **one-time** (void after a single redemption — one order, one code) and **time-limited** (start with T, redeemable by multiple users before expiry). Bulk generation and TXT export make it easy to drop codes into your own auto-delivery flow.
+
+Zero platform cut during the launch period. The platform only charges points for generating passcodes (covering the generation & verification infrastructure) — it never touches your pricing or your payments.
 
 ## Install
 
 Requires dsh web 0.1.0-rc.6 or newer.
 
-From npm:
+From npm (recommended — smoothest upgrades):
 
 ```sh
 dsh plugin --profile web add dshhub-market
@@ -52,7 +58,7 @@ dsh plugin --profile web add dshhub-market
 Or a pinned version from DSHHub.co (versioned links never change, so lockfile checksums stay stable):
 
 ```sh
-dsh plugin --profile web add https://www.dshhub.co/dshhub-market-0.8.2.tgz
+dsh plugin --profile web add https://www.dshhub.co/dshhub-market-0.8.51.tgz
 ```
 
 Or from GitHub:
@@ -63,15 +69,15 @@ dsh plugin --profile web add github:dshhub-co/dshhub-market
 
 Restart `dsh web`, then open **Settings → Plugin Market**.
 
-Prefer the npm name — upgrades are smoothest that way. If you install from the website URL, run `pnpm install --update-checksums` in the profile directory after each release (the URL serves the latest tarball, so the lockfile checksum needs a refresh). GitHub installs work out of the box, with no build scripts to allow.
-
-On an older host the market disables itself and says so in the browser console — if the Plugin Market entry never appears, that's usually why. A desktop build may bundle a dsh older than the one npm would give you.
+> Note: if you install from the website versioned link, run `pnpm install --update-checksums` in the profile directory after each release (the link points at the latest tarball, so the lockfile checksum needs a refresh). GitHub installs work out of the box, with no build scripts to allow.
+>
+> On an older host the market disables itself and says so in the browser console — if the Plugin Market entry never appears, that's usually why.
 
 ## Under the hood
 
 As a market app it also carries these real capabilities:
 
-- **One-click install** — confirm the source, watch live progress; most plugins are ready after a refresh
+- **Passcode unlock & install** — enter a code, it installs; sources are validated against the DSHHub.co registry allowlist
 - **Theme skins** — apply instantly, no restart
 - **Update / uninstall** — two-step confirm against accidents
 - **Hot disable / enable** — takes effect in about a second, survives reboots
@@ -84,7 +90,7 @@ As a market app it also carries these real capabilities:
 ## Security
 
 - Installs are restricted to sources in the DSHHub.co registry — anything else is rejected
-- Code from private repositories never enters the public catalog — it passes through the platform only when a fan redeems a code
+- Code from private repositories never enters the public catalog — it passes through the platform only when a buyer redeems a code
 - Build scripts stay blocked by default; allowing one is your explicit choice
 - The install endpoint accepts same-origin requests only
 - The local bridge for dshhub.co accepts loopback and dshhub.co origins only

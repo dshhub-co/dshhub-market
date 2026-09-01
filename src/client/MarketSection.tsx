@@ -558,6 +558,24 @@ export interface MarketSectionProps {
 
 export function MarketSection(props: MarketSectionProps) {
   const t = props.t
+
+  // 云轮询随市场界面生命周期启停（0.8.56）：打开市场界面 → 轮询（任务即时）；
+  // 关闭界面 → 停止轮询（0 平台请求，极致资源优化）。经宿主路由控制，
+  // 不直接 import Node 端 cloud-bridge（防 bundle 混入 Node 模块）。
+  useEffect(() => {
+    fetch('/dsh-market/bridge-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start' }),
+    }).catch(() => {})
+    return () => {
+      fetch('/dsh-market/bridge-control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' }),
+      }).catch(() => {})
+    }
+  }, [])
   const initialWebdav = useMemo(savedWebdav, [])
   const localeSnap = useSyncExternalStore(
     cb => props.locale.subscribe(cb),

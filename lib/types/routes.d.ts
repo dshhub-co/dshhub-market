@@ -12,6 +12,7 @@ import { type PluginCommandRuntime } from './dsh-cli.ts';
 import { type AgentsLookup } from './agents.ts';
 import { type Channel } from './channels.ts';
 import { type LoaderEntry } from './themes.ts';
+export declare function setBridgeProfile(profile: string): void;
 export type { LoaderEntry } from './themes.ts';
 export type { UpdateStatus } from './updates.ts';
 export interface WebServerService {

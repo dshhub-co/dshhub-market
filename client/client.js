@@ -3416,6 +3416,20 @@ window.__ModuleLoader__.load({ id: "dshhub-market", factory: (require) => {
 		];
 		function MarketSection(props) {
 			const t = props.t;
+			(0, react.useEffect)(() => {
+				fetch("/dsh-market/bridge-control", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ action: "start" })
+				}).catch(() => {});
+				return () => {
+					fetch("/dsh-market/bridge-control", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ action: "stop" })
+					}).catch(() => {});
+				};
+			}, []);
 			const initialWebdav = (0, react.useMemo)(savedWebdav, []);
 			const localeSnap = (0, react.useSyncExternalStore)((cb) => props.locale.subscribe(cb), () => props.locale.getSnapshot());
 			const lang = String(localeSnap.active).toLowerCase().startsWith("zh") ? "zh" : "en";

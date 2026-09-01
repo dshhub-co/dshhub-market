@@ -8,7 +8,6 @@ import { createDesktopPluginRuntime, type DesktopPnpmLike } from './dsh-cli.ts'
 import { mountMarketRoutes, type MarketConfig, type MarketHost } from './routes.ts'
 import { installMarketSettings } from './settings.ts'
 import { startBridge } from './bridge.ts'
-import { startCloudBridge } from './cloud-bridge.ts'
 import { scheduleSelfUpdate } from './self-update.ts'
 import type { AgentsServiceLike } from './agents.ts'
 
@@ -86,10 +85,8 @@ export function apply(ctx: Context, config?: Config): void {
       // fork: website one-click install bridge (DSHHUB_DISABLE_BRIDGE=1 to
       // opt out) and tarball self-update (DSHHUB_DISABLE_AUTOUPDATE=1).
       if (process.env.DSHHUB_DISABLE_BRIDGE !== '1') void startBridge(resolved.profile)
-      // fork: cloud publish channel — browser never talks to 127.0.0.1; the
-      // bridge registers with the platform and polls its task queue instead
-      // (DSHHUB_DISABLE_BRIDGE=1 opts out of this too).
-      if (process.env.DSHHUB_DISABLE_BRIDGE !== '1') void startCloudBridge(resolved.profile)
+      // fork: cloud publish channel — 不再随插件自动启动（0.8.56 起改为
+      // 市场界面驱动：打开市场界面才轮询，关闭即停止，见 /dsh-market/bridge-control）。
       scheduleSelfUpdate(resolved.profile)
       return
     }

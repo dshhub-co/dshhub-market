@@ -75,7 +75,11 @@ import { checkUpdates, fetchNpmLatest, invalidateUpdates, isLocalPathSpec, isUpg
 import { FORK_SELF_NAME, fetchOwnVersion, selfUpdateTarget, updateBase } from './self-update.ts'
 import { createThemeManager, type LoaderEntry } from './themes.ts'
 import { readJsonBody, sameOrigin, sendJson } from './http.ts'
-import { bindToAccount } from './cloud-bridge.ts'
+import { bindToAccount, startCloudBridge, stopCloudBridge } from './cloud-bridge.ts'
+
+/** 云轮询当前 profile（mountMarketRoutes 时记录，bridge-control 用） */
+let bridgeProfile = ''
+export function setBridgeProfile(profile: string): void { bridgeProfile = profile }
 import { restartAllowed, scheduleRestart, servingPort, trustedRestartRequest, trustedDownloadRequest } from './restart.ts'
 import { activationAfterReplace, hasHostHalf, verifyActivation } from './verify.ts'
 import {
@@ -193,6 +197,7 @@ export function mountMarketRoutes(
   // Ordinary DSH profile names cross the CLI boundary and keep the legacy
   // allowlist. A host-authoritative explicit directory (DSH Desktop) may
   // legitimately pair with a Unicode or spaced display/profile name.
+  setBridgeProfile(config.profile)
   if (config.profileDirectory === undefined && !PROFILE_RE.test(config.profile)) {
     throw new Error(`dsh-market: invalid profile name: ${config.profile}`)
   }
@@ -661,6 +666,35 @@ export function mountMarketRoutes(
     }),
 
     // ---- 绑定 dshhub 账号（配对码；Node 端读桥接状态并调平台，浏览器 UI 只发命令） ----
+    host.webServer.register({
+      kind: 'exact',
+      path: '/dsh-market/bridge-control',
+      handler: async (request, response) => {
+        if (request.method !== 'POST') {
+          response.writeHead(405, { allow: 'POST' })
+          response.end()
+          return
+        }
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'untrusted origin' })
+          return
+        }
+        try {
+          const body = (await readJsonBody(request)) as { action?: unknown }
+          const action = typeof body.action === 'string' ? body.action : ''
+          // 云轮询随市场界面生命周期启停（0.8.56）：界面打开=start，关闭=stop
+          if (action === 'start') {
+            if (bridgeProfile !== '') void startCloudBridge(bridgeProfile)
+          } else if (action === 'stop') {
+            stopCloudBridge()
+          }
+          sendJson(response, 200, { ok: true })
+        } catch (error) {
+          sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) })
+        }
+      },
+    }),
+
     host.webServer.register({
       kind: 'exact',
       path: '/dsh-market/bind-account',

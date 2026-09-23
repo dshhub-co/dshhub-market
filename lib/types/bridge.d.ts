@@ -7,7 +7,10 @@
  *
  * Contract (kept byte-compatible with the legacy bridge so the website's
  * InstallHarnessButton keeps working):
- *   GET  /health   → { ok, bridge: 'dshhub-market', version, profile }
+ *   GET  /health   → { ok, bridge: 'dshhub-market', version, profile, home }
+ *                    home = 本实例的 DSH_HOME：用于识别端口上的桥接是不是
+ *                    「自己人」（别的 DSH 实例绝不能复用，否则打开目录/安装
+ *                    会打到对方的 home 上）
  *   POST /install  → body { id: <dshhub plugin uuid> } → { ok, message|error }
  *   GET  /dsh-market/publish/scan  → { presets, skills }（本机扫描，供发布页勾选）
  *   POST /dsh-market/publish/upload → body { items, token, accountId, authorName, demoUrl? }
@@ -45,6 +48,23 @@ export declare function createBridgeServer(opts: {
  * demoUrl 时回落为 { demo: demoUrl }。
  */
 export declare function publishUpload(body: PublishUploadBody, profile: string): Promise<PublishResult>;
+/** /health 自述信息（0.8.59 及更早没有 home 字段） */
+export interface BridgeHealth {
+    bridge?: unknown;
+    profile?: unknown;
+    home?: unknown;
+}
+/** 探测端口上的桥接：返回它的自述信息；null = 这不是 dshhub-market 桥接 */
+export declare function probeBridge(port: number): Promise<BridgeHealth | null>;
+/**
+ * 端口上的桥接是不是「我自己」。
+ *
+ * 只比对品牌名是不够的：机器上另一个 DSH 实例——比如 e2e 测试残留的进程，
+ * 它的 DSH_HOME 指向一个临时目录——同样会回答 { bridge: 'dshhub-market' }。
+ * 一旦被当成自己人复用，本实例就一个端口都不绑，之后发布页的打开目录/安装
+ * 全部打到那个临时 home 上（表现为「目录不存在」、插件装到别处）。
+ */
+export declare function isSameInstance(h: BridgeHealth, profile: string): boolean;
 /**
  * Start the bridge on the first free port (3750-3754). When another DSH
  * instance already runs one, reuse it silently. Idempotent per process.

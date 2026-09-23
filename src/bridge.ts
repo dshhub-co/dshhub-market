@@ -7,7 +7,10 @@
  *
  * Contract (kept byte-compatible with the legacy bridge so the website's
  * InstallHarnessButton keeps working):
- *   GET  /health   → { ok, bridge: 'dshhub-market', version, profile }
+ *   GET  /health   → { ok, bridge: 'dshhub-market', version, profile, home }
+ *                    home = 本实例的 DSH_HOME：用于识别端口上的桥接是不是
+ *                    「自己人」（别的 DSH 实例绝不能复用，否则打开目录/安装
+ *                    会打到对方的 home 上）
  *   POST /install  → body { id: <dshhub plugin uuid> } → { ok, message|error }
  *   GET  /dsh-market/publish/scan  → { presets, skills }（本机扫描，供发布页勾选）
  *   POST /dsh-market/publish/upload → body { items, token, accountId, authorName, demoUrl? }
@@ -15,6 +18,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { resolve } from 'node:path'
 import { loadRegistry } from './registry.ts'
 import { isBlacklisted } from './blacklist.ts'
 import { entryNeedsZip, materializeTgz } from './zip-source.ts'
@@ -25,7 +29,7 @@ import { installSkill } from './skill-install.ts'
 import { installPreset } from './preset-install.ts'
 import { scanPresets, scanSkills, type ScannedItem } from './preset-scan.ts'
 import { buildPublishInfo, publishItems, type PublishItemInfo, type PublishResult } from './publish.ts'
-import { profileDir } from './profile.ts'
+import { profileDir, dshHome } from './profile.ts'
 import { openStandardDir } from './cloud-bridge.ts'
 
 export const PORTS = [3750, 3751, 3752, 3753, 3754]
@@ -204,6 +208,9 @@ export function createBridgeServer(opts: { profile: string }): ReturnType<typeof
         bridge: 'dshhub-market',
         version: readOwnVersion(),
         profile,
+        // 标识「我是哪个 DSH 实例」：另一个 DSH（或测试残留进程）的桥接
+        // 回答得一模一样，只靠品牌名会把它误当成自己人（见 startBridge）。
+        home: dshHome(),
       })
       return
     }
@@ -315,15 +322,39 @@ export async function publishUpload(body: PublishUploadBody, profile: string): P
   return { ok: true, published }
 }
 
-async function probeBridge(port: number): Promise<boolean> {
+/** /health 自述信息（0.8.59 及更早没有 home 字段） */
+export interface BridgeHealth {
+  bridge?: unknown
+  profile?: unknown
+  home?: unknown
+}
+
+/** 探测端口上的桥接：返回它的自述信息；null = 这不是 dshhub-market 桥接 */
+export async function probeBridge(port: number): Promise<BridgeHealth | null> {
   try {
     const r = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(800) })
-    if (!r.ok) return false
-    const d = (await r.json().catch(() => ({}))) as { bridge?: unknown }
-    return d?.bridge === 'dshhub-market'
+    if (!r.ok) return null
+    const d = (await r.json().catch(() => ({}))) as BridgeHealth
+    return d?.bridge === 'dshhub-market' ? d : null
   } catch {
-    return false
+    return null
   }
+}
+
+/**
+ * 端口上的桥接是不是「我自己」。
+ *
+ * 只比对品牌名是不够的：机器上另一个 DSH 实例——比如 e2e 测试残留的进程，
+ * 它的 DSH_HOME 指向一个临时目录——同样会回答 { bridge: 'dshhub-market' }。
+ * 一旦被当成自己人复用，本实例就一个端口都不绑，之后发布页的打开目录/安装
+ * 全部打到那个临时 home 上（表现为「目录不存在」、插件装到别处）。
+ */
+export function isSameInstance(h: BridgeHealth, profile: string): boolean {
+  if (h.profile !== profile) return false
+  // 老版本 /health 不带 home：沿用「同 profile 即复用」的旧语义，
+  // 否则升级期间新旧实例会互相抢端口、谁也起不来。
+  if (typeof h.home !== 'string' || h.home === '') return true
+  return resolve(h.home) === resolve(dshHome())
 }
 
 function listen(server: ReturnType<typeof createServer>, port: number): Promise<number> {
@@ -348,9 +379,17 @@ export async function startBridge(profile: string): Promise<{ ok: boolean; port?
   const server = createBridgeServer({ profile })
 
   for (const port of PORTS) {
-    if (await probeBridge(port)) {
+    const health = await probeBridge(port)
+    if (health && isSameInstance(health, profile)) {
       console.log(`[dshhub-market] bridge already running on 127.0.0.1:${port} — reusing (profile: ${profile})`)
       return { ok: true, port, reused: true }
+    }
+    if (health) {
+      // 端口被**别的** DSH 实例占着（不同 DSH_HOME）：绝不复用——复用它意味着
+      // 打开目录/安装插件会打到对方那个 home 上。换下一个端口，绑自己的。
+      console.warn(
+        `[dshhub-market] port ${port} is held by another DSH instance (home: ${String(health.home ?? '?')}, profile: ${String(health.profile ?? '?')}) — binding the next free port instead`,
+      )
     }
     try {
       await listen(server, port)

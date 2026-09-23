@@ -10,14 +10,24 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { githubRemoteIdentities, githubRepoIdentities } from './sources.ts'
 
 /**
+ * The active DSH home (default ~/.dsh). Single source of truth: the local
+ * bridge reports this in /health so other DSH instances can tell whether a
+ * bridge on some port actually belongs to *them* — a leftover test instance
+ * (or another DSH install) answers /health just the same, and reusing it
+ * silently routes installs/opens into the wrong home.
+ */
+export function dshHome(): string {
+  return process.env.DSH_HOME ?? join(homedir(), '.dsh')
+}
+
+/**
  * Resolve a profile name to its directory under DSH_HOME (default ~/.dsh).
  * An explicit directory is used by hosts, such as DSH Desktop, that own the
  * active profile location rather than deriving it from process environment.
  */
 export function profileDir(profile: string, explicitDir?: string): string {
   if (explicitDir !== undefined) return explicitDir
-  const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-  return join(home, 'profiles', profile)
+  return join(dshHome(), 'profiles', profile)
 }
 
 /**

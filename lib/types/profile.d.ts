@@ -4,6 +4,14 @@
  * functions of the directory contents; no processes, no network.
  */
 /**
+ * The active DSH home (default ~/.dsh). Single source of truth: the local
+ * bridge reports this in /health so other DSH instances can tell whether a
+ * bridge on some port actually belongs to *them* — a leftover test instance
+ * (or another DSH install) answers /health just the same, and reusing it
+ * silently routes installs/opens into the wrong home.
+ */
+export declare function dshHome(): string;
+/**
  * Resolve a profile name to its directory under DSH_HOME (default ~/.dsh).
  * An explicit directory is used by hosts, such as DSH Desktop, that own the
  * active profile location rather than deriving it from process environment.
